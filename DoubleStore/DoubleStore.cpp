@@ -35,7 +35,7 @@ namespace {
 	    }
    	 }
       }
-      return false;
+      return true;
    }
 
    bool doFinalization(Module &M) override{
