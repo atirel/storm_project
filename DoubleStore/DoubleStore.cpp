@@ -1,9 +1,31 @@
+#if _WIN32 || _WIN64
+   #if _WIN64
+      #define ENV64BIT
+   #else
+      #define ENV32BIT
+   #endif
+#endif
+
+#if __GNUC__
+   #if __x86_64__ || __ppc64__
+      #define ENV64BIT
+   #else
+      #define ENV32BIT
+   #endif
+#endif
+
+
+
+
 #include "llvm/Pass.h"
+#include "llvm-c/Core.h"
 #include "llvm/IR/Function.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/IR/LLVMContext.h"
 #include <cstring>
 #include <stdio.h>
 #include <vector>
@@ -14,9 +36,8 @@ namespace {
  struct DoubleStoreInstr : public ModulePass {
 
    static char ID;
-   static int numLOAD;
-   static int numSTORE;
-   static int numUSTORE;
+   static int numSTORE0ADDED;
+   static int numSTOREDELETED;
 
    DoubleStoreInstr() : ModulePass(ID) {}
 
@@ -42,10 +63,8 @@ namespace {
       errs() << "\033[0;36m======================================\033[0;0m\n";
       errs() << "\033[0;36m=======   TRACKER STATISTICS   =======\033[0;0m\n";
       errs() << "\033[0;36m======================================\033[0;0m\n";
-      errs() << "\033[0;36m Total STORE: " << numSTORE << "\033[0;0m\n";
-      errs() << "\033[0;31m Useless ones: " << numUSTORE << "\033[0;0m\n";
-      errs() << "\033[0;32m Usefull ones: " << (numSTORE - numUSTORE) << "\033[0;0m\n";
-      errs() << "\033[0;36m Total LOAD: " << numLOAD << "\033[0;0m\n";
+      errs() << "\033[0;32m Added " << numSTORE0ADDED << " STORE 0 Instruction\033[0;0m\n";
+      errs() << "\033[0;31m Removed " << numSTOREDELETED << " useless STORE\033[0;0m\n";
       return false;
    }
 
@@ -54,31 +73,53 @@ namespace {
       unsigned int Ioperands = I.getNumOperands();
       Value* operand = I.getOperand(Ioperands - 1);
       int i = size - 1;
+      storage.push_back(&I);
+      if(I.getType()->isIntegerTy(64)){
+	 errs() << "c\n";
+      }
       if(I.getOpcode() == 31){
-	 numSTORE++;
       	 while(i >= 0){
            if(operand == storage[i]->getOperand(storage[i]->getNumOperands()-1)){//if the adress where the value is stored/load is the same
 	      if(storage[i]->getOpcode() == 31){//31 stands for store
 		 storage[i]->eraseFromParent();
 		 storage.erase(storage.begin()+i);
 		 storage.push_back(&I);
+		 numSTOREDELETED++;
 		 return;
 	      }
 	      if(storage[i]->getOpcode() == 30){//30 stands for load
-		 numLOAD++;
+		 errs() << "\n";
+		 IRBuilder<> Builder(storage[i+1]);
+		 StoreInst* Store0 = nullptr;
+		 
+		 if(storage[i]->getType()->isIntegerTy(32)){
+		    errs() << "abnormal result\n";
+		    Store0 = Builder.CreateStore(ConstantInt::get(Builder.getInt32Ty(), 0), operand, true);
+		 }
+
+		 if(storage[i]->getType()->isIntegerTy(64)){
+   		    Store0 = Builder.CreateStore(ConstantInt::get(Builder.getInt64Ty(), 0), operand, true);
+		 }
+
+		 if(storage[i]->getType()->isFloatTy()){
+		    Store0 = Builder.CreateStore(ConstantFP::get(Builder.getFloatTy(), 0), operand, true);
+		 }
+ 		 if(Store0 == nullptr){
+		    errs() << "can't do my stuff\n";
+		 }
+		 numSTORE0ADDED++;
+		 storage.push_back(Store0);
 		 return;
 	      }
 	   }
 	   --i;
 	 }
       }
-      storage.push_back(&I);
     }
  };
 }
 
 char DoubleStoreInstr::ID = 0;
-int DoubleStoreInstr::numLOAD = 0;
-int DoubleStoreInstr::numSTORE = 0;
-int DoubleStoreInstr::numUSTORE = 0;
+int DoubleStoreInstr::numSTORE0ADDED = 0;
+int DoubleStoreInstr::numSTOREDELETED = 0;
 static RegisterPass<DoubleStoreInstr> X("DoubleStore", "DoubleStore Pass");

@@ -1,12 +1,6 @@
-#PASS_DIR=`pwd`/../build/LoadStore
-#PASSLIB=LLVMLoadStore.so
-#PASS=-LoadStore
-
-
-#PASS_DIR=`pwd`/../build/HelloWorld
-#PASSLIB=LLVMHelloWorld.so
-#PASS=-HelloWorld
-
+#PASS_DIR=`pwd`/build/0Store
+#PASSLIB=LLVM0Store.so
+#PASS=-Store0
 
 PASS_DIR=`pwd`/build/DoubleStore
 PASSLIB=LLVMDoubleStore.so

@@ -18,6 +18,5 @@ include(AddLLVM)
 
 link_directories(${LLVM_LIBRARY_DIRS})
 
-add_subdirectory(HelloWorld)
-add_subdirectory(LoadStore)
 add_subdirectory(DoubleStore)
+add_subdirectory(0Store)
