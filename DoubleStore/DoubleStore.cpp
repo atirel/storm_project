@@ -22,7 +22,6 @@
 
 
 
-
 #include "llvm/Pass.h"
 #include "llvm-c/Core.h"
 #include "llvm/IR/Function.h"
@@ -50,18 +49,12 @@ namespace {
 
    bool runOnModule(Module &M) override {
       for(Function &F : M){
-	 errs() << "Treating function: " << F.getName() << "\n";
          for(BasicBlock &B : F){
 	    SmallVector<Instruction*, 64> storage;
             for(Instruction &I : B){
-	       errs() << I << "\n";
 	       update_storage(storage, I);
 	    }
-	    errs() << "\n\n";
-	    for(Instruction &I : B){
-	       errs() << I << "\n";
-	    }
-   	 }
+  	 }
       }
       return true;
    }
@@ -87,12 +80,10 @@ namespace {
 	      if(storage[i]->getOpcode() == 31){//31 stands for store
 		 storage[i]->eraseFromParent();
 		 storage.erase(storage.begin()+i);
-		 storage.push_back(&I);
 		 numSTOREDELETED++;
 		 return;
 	      }
 	      if(storage[i]->getOpcode() == 30){//30 stands for load
-		 errs() << "\n";
 		 IRBuilder<> Builder(storage[i+1]);
 		 StoreInst* Store0 = nullptr;
 
@@ -130,6 +121,10 @@ namespace {
 		       Store0 = Builder.CreateStore(ConstantFP::get(Type::getX86_MMXTy(Builder.getContext()), 0), operand, true);
 		       break;
 /*
+		    case Type::PointerTyID:
+		       Store0 = Builder.CreateStore(ConstantPointerNull::getType(Type::getIntN(cast<PointerType>(storage[i]->getType())->getBitWidth()), 0), operand, true);
+		       break;
+
 		    case Type::VectorTyID:
 		       Store0 = Builder.CreateStore(ConstantDataVector::get(Type::getVectorTy(Builder.getContext()), 0), operand, true);
 		       break;*/
