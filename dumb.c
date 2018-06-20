@@ -7,19 +7,20 @@ int pointless(void){
    int b;
    float c=1.2;
    c=1.3;
-   printf("%f\n", c);
+   float f = c;
    int* array = (int *) malloc(sizeof(int) * 42);
    a = 3;
    b = a;
    b = 2;
    a = 4;
-   printf("%d\n",b);
    d = 'r';
+   char e = d;
+   d = 'e';
    b = 3;
    array = (int *)malloc(sizeof(int) * 50);
    c = 1.1;
    array = (int *)malloc(sizeof(int) * 10);
-   return a;
+   return e;
 }
 
 

@@ -1,3 +1,9 @@
+/**
+ * This LLVM pass deletes useless stores e.g store which are followed by another store
+ * It also adds a STORE 0 %add after a load followed by a store in order to check with their values wether or not 2 variables are semantically equivalent
+ * @author INRIA Bordeaux STORM Project Team
+ **/
+
 #if _WIN32 || _WIN64
    #if _WIN64
       #define ENV64BIT
@@ -24,8 +30,9 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IRBuilder.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/LLVMContext.h"
+#include "llvm/IR/Value.h"
+#include "llvm/ADT/SmallVector.h"
 #include <cstring>
 #include <stdio.h>
 #include <vector>
@@ -36,14 +43,14 @@ namespace {
  struct DoubleStoreInstr : public ModulePass {
 
    static char ID;
-   static int numSTORE0ADDED;
-   static int numSTOREDELETED;
+   static int numSTORE0ADDED;//The number of instruction STORE 0 added
+   static int numSTOREDELETED;//The number of useless STORE removed
 
    DoubleStoreInstr() : ModulePass(ID) {}
 
    bool runOnModule(Module &M) override {
-      Value *lst_opnd_store = NULL;
       for(Function &F : M){
+	 errs() << "Treating function: " << F.getName() << "\n";
          for(BasicBlock &B : F){
 	    SmallVector<Instruction*, 64> storage;
             for(Instruction &I : B){
@@ -74,9 +81,6 @@ namespace {
       Value* operand = I.getOperand(Ioperands - 1);
       int i = size - 1;
       storage.push_back(&I);
-      if(I.getType()->isIntegerTy(64)){
-	 errs() << "c\n";
-      }
       if(I.getOpcode() == 31){
       	 while(i >= 0){
            if(operand == storage[i]->getOperand(storage[i]->getNumOperands()-1)){//if the adress where the value is stored/load is the same
@@ -91,19 +95,46 @@ namespace {
 		 errs() << "\n";
 		 IRBuilder<> Builder(storage[i+1]);
 		 StoreInst* Store0 = nullptr;
+
+		 switch (storage[i]->getType()->getTypeID()) {
+
+		    case Type::IntegerTyID:
+		       Store0 = Builder.CreateStore(ConstantInt::get(Builder.getIntNTy(cast<IntegerType>(storage[i]->getType())->getBitWidth()), 0), operand, true);
+		       break;
 		 
-		 if(storage[i]->getType()->isIntegerTy(32)){
-		    errs() << "abnormal result\n";
-		    Store0 = Builder.CreateStore(ConstantInt::get(Builder.getInt32Ty(), 0), operand, true);
+		    case Type::FloatTyID:
+		       Store0 = Builder.CreateStore(ConstantFP::get(Builder.getFloatTy(), 0), operand, true);
+		       break;
+
+		    case Type::DoubleTyID:
+		       Store0 = Builder.CreateStore(ConstantFP::get(Builder.getDoubleTy(), 0), operand, true);
+		       break;
+
+		    case Type::HalfTyID:
+		       Store0 = Builder.CreateStore(ConstantFP::get(Builder.getHalfTy(), 0), operand, true);
+		       break;
+		    
+		    case Type::FP128TyID:
+		       Store0 = Builder.CreateStore(ConstantFP::get(Type::getFP128Ty(Builder.getContext()), 0), operand, true);
+		       break;
+		    
+		    case Type::X86_FP80TyID:
+		       Store0 = Builder.CreateStore(ConstantFP::get(Type::getX86_FP80Ty(Builder.getContext()), 0), operand, true);
+		       break;
+
+		    case Type::PPC_FP128TyID:
+		       Store0 = Builder.CreateStore(ConstantFP::get(Type::getPPC_FP128Ty(Builder.getContext()), 0), operand, true);
+		       break;
+
+		    case Type::X86_MMXTyID:
+		       Store0 = Builder.CreateStore(ConstantFP::get(Type::getX86_MMXTy(Builder.getContext()), 0), operand, true);
+		       break;
+/*
+		    case Type::VectorTyID:
+		       Store0 = Builder.CreateStore(ConstantDataVector::get(Type::getVectorTy(Builder.getContext()), 0), operand, true);
+		       break;*/
 		 }
 
-		 if(storage[i]->getType()->isIntegerTy(64)){
-   		    Store0 = Builder.CreateStore(ConstantInt::get(Builder.getInt64Ty(), 0), operand, true);
-		 }
-
-		 if(storage[i]->getType()->isFloatTy()){
-		    Store0 = Builder.CreateStore(ConstantFP::get(Builder.getFloatTy(), 0), operand, true);
-		 }
  		 if(Store0 == nullptr){
 		    errs() << "can't do my stuff\n";
 		 }
