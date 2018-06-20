@@ -60,6 +60,7 @@ namespace {
    }
 
    bool doFinalization(Module &M) override{
+      errs() << "\n(Information are displayed in file:line:column mode)\n\n";
       errs() << "\033[0;36m======================================\033[0;0m\n";
       errs() << "\033[0;36m=======   TRACKER STATISTICS   =======\033[0;0m\n";
       errs() << "\033[0;36m======================================\033[0;0m\n";
@@ -79,11 +80,18 @@ namespace {
            if(operand == storage[i]->getOperand(storage[i]->getNumOperands()-1)){//if the adress where the value is stored/load is the same
 	      if(storage[i]->getOpcode() == 31){//31 stands for store
 		 storage[i]->eraseFromParent();
+		 StoreInst *SI = dyn_cast< StoreInst >(storage[i]);
+		 DebugLoc Dloc = storage[i]->getDebugLoc();
+		 errs() << "erasing instruction\t\t\t";
+		 Dloc.print(errs());
+ 		 errs() << "\n";
 		 storage.erase(storage.begin()+i);
 		 numSTOREDELETED++;
 		 return;
 	      }
 	      if(storage[i]->getOpcode() == 30){//30 stands for load
+		 LoadInst *Li = dyn_cast<LoadInst>(storage[i]);
+		 DebugLoc Dloc = storage[i]->getDebugLoc();
 		 IRBuilder<> Builder(storage[i+1]);
 		 StoreInst* Store0 = nullptr;
 
@@ -101,7 +109,7 @@ namespace {
 		       Store0 = Builder.CreateStore(ConstantFP::get(Builder.getDoubleTy(), 0), operand, true);
 		       break;
 
-		    case Type::HalfTyID:
+		   case Type::HalfTyID:
 		       Store0 = Builder.CreateStore(ConstantFP::get(Builder.getHalfTy(), 0), operand, true);
 		       break;
 		    
@@ -132,6 +140,11 @@ namespace {
 
  		 if(Store0 == nullptr){
 		    errs() << "can't do my stuff\n";
+		 }
+		 else{
+		    errs() << "adding STORE 0 (after)\t\t\t";
+		    Dloc.print(errs());
+		    errs() << "\n";
 		 }
 		 numSTORE0ADDED++;
 		 storage.push_back(Store0);
