@@ -36,5 +36,10 @@
 *.ll
 *.bc
 
+# Temporary files
+*~
+.*.swp
+
+#other stuff
 build/
 .compiler.sh
