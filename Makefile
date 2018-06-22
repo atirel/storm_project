@@ -1,14 +1,9 @@
-#PASS_DIR=`pwd`/build/0Store
-#PASSLIB=LLVM0Store.so
-#PASS=-Store0
-
 PASS_DIR=`pwd`/build/DoubleStore
 PASSLIB=LLVMDoubleStore.so
 PASS=-DoubleStore
 
 
 REQUIREDPASS=
-TST=`pwd`/test
 
 CC=clang
 CXX=clang++
@@ -18,7 +13,7 @@ LLC=llc
 
 CFLAGS=
 
-EXEC=cheeky
+EXEC=dumb
 
 all: $(EXEC)
 

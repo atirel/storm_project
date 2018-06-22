@@ -54,6 +54,14 @@ namespace {
             for(Instruction &I : B){
 	       update_storage(storage, I);
 	    }
+	    int cpt = storage.end() - storage.begin() - 1;
+	    while(cpt >= 0){
+	       if(storage[cpt]->getOpcode() == 30 || storage[cpt]->getOpcode() == 31){
+   		  addLastStore(storage, *storage[cpt], cpt);
+		  errs() << *storage[cpt]->getOperand(0) << "\n";
+	       }
+	       cpt--;
+	    }
   	 }
       }
       return true;
@@ -67,6 +75,79 @@ namespace {
       errs() << "\033[0;32m Added " << numSTORE0ADDED << " STORE 0 Instruction\033[0;0m\n";
       errs() << "\033[0;31m Removed " << numSTOREDELETED << " useless STORE\033[0;0m\n";
       return false;
+   }
+
+   StoreInst* addStore0(SmallVector<Instruction*, 64> &storage, int i, Value* operand){
+      DebugLoc Dloc = storage[i]->getDebugLoc();
+      IRBuilder<> Builder(storage[i+1]);
+      StoreInst* Store0 =  nullptr;
+      int ID = 0;
+      if(storage[i]->getOpcode() == 30){
+	 ID = storage[i]->getType()->getTypeID();
+	 LoadInst *Li = dyn_cast<LoadInst>(storage[i]);
+      }
+      else{
+	 ID = storage[i]->getOperand(0)->getType()->getTypeID();
+	 StoreInst *SI = dyn_cast<StoreInst>(storage[i]);
+      }
+      switch (ID) {
+
+	 case Type::IntegerTyID:
+	    if(storage[i]->getOpcode() == 30){
+   	       Store0 = Builder.CreateStore(ConstantInt::get(Builder.getIntNTy(cast<IntegerType>(storage[i]->getType())->getBitWidth()), 0), operand, true);
+	    }
+	    else{ 
+   	       Store0 = Builder.CreateStore(ConstantInt::get(Builder.getIntNTy(cast<IntegerType>(storage[i]->getOperand(0)->getType())->getBitWidth()), 0), operand, true);
+	    }
+	    break;
+		 
+	 case Type::FloatTyID:
+	    Store0 = Builder.CreateStore(ConstantFP::get(Builder.getFloatTy(), 0), operand, true);
+	    break;
+
+	 case Type::DoubleTyID:
+	    Store0 = Builder.CreateStore(ConstantFP::get(Builder.getDoubleTy(), 0), operand, true);
+	    break;
+
+	 case Type::HalfTyID:
+	    Store0 = Builder.CreateStore(ConstantFP::get(Builder.getHalfTy(), 0), operand, true);
+	    break;
+		    
+	 case Type::FP128TyID:
+	    Store0 = Builder.CreateStore(ConstantFP::get(Type::getFP128Ty(Builder.getContext()), 0), operand, true);
+	    break;
+		    
+	 case Type::X86_FP80TyID:
+	    Store0 = Builder.CreateStore(ConstantFP::get(Type::getX86_FP80Ty(Builder.getContext()), 0), operand, true);
+	    break;
+
+	 case Type::PPC_FP128TyID:
+	    Store0 = Builder.CreateStore(ConstantFP::get(Type::getPPC_FP128Ty(Builder.getContext()), 0), operand, true);
+	    break;
+
+	 case Type::X86_MMXTyID:
+	    Store0 = Builder.CreateStore(ConstantFP::get(Type::getX86_MMXTy(Builder.getContext()), 0), operand, true);
+	    break;
+/*
+		    case Type::PointerTyID:
+		       Store0 = Builder.CreateStore(ConstantPointerNull::getType(Type::getIntN(cast<PointerType>(storage[i]->getType())->getBitWidth()), 0), operand, true);
+		       break;
+
+		    case Type::VectorTyID:
+		       Store0 = Builder.CreateStore(ConstantDataVector::get(Type::getVectorTy(Builder.getContext()), 0), operand, true);
+		       break;*/
+      }
+
+      if(Store0 == nullptr){
+	 errs() << "can't do my stuff\n";
+      }
+      else{
+	 errs() << "adding STORE 0 (after)\t\t\t";
+	 Dloc.print(errs());
+	 errs() << "\n";
+      }
+      numSTORE0ADDED++;
+      return Store0;
    }
 
    void update_storage(SmallVector<Instruction*, 64>& storage, Instruction &I){
@@ -90,63 +171,7 @@ namespace {
 		 return;
 	      }
 	      if(storage[i]->getOpcode() == 30){//30 stands for load
-		 LoadInst *Li = dyn_cast<LoadInst>(storage[i]);
-		 DebugLoc Dloc = storage[i]->getDebugLoc();
-		 IRBuilder<> Builder(storage[i+1]);
-		 StoreInst* Store0 = nullptr;
-
-		 switch (storage[i]->getType()->getTypeID()) {
-
-		    case Type::IntegerTyID:
-		       Store0 = Builder.CreateStore(ConstantInt::get(Builder.getIntNTy(cast<IntegerType>(storage[i]->getType())->getBitWidth()), 0), operand, true);
-		       break;
-		 
-		    case Type::FloatTyID:
-		       Store0 = Builder.CreateStore(ConstantFP::get(Builder.getFloatTy(), 0), operand, true);
-		       break;
-
-		    case Type::DoubleTyID:
-		       Store0 = Builder.CreateStore(ConstantFP::get(Builder.getDoubleTy(), 0), operand, true);
-		       break;
-
-		   case Type::HalfTyID:
-		       Store0 = Builder.CreateStore(ConstantFP::get(Builder.getHalfTy(), 0), operand, true);
-		       break;
-		    
-		    case Type::FP128TyID:
-		       Store0 = Builder.CreateStore(ConstantFP::get(Type::getFP128Ty(Builder.getContext()), 0), operand, true);
-		       break;
-		    
-		    case Type::X86_FP80TyID:
-		       Store0 = Builder.CreateStore(ConstantFP::get(Type::getX86_FP80Ty(Builder.getContext()), 0), operand, true);
-		       break;
-
-		    case Type::PPC_FP128TyID:
-		       Store0 = Builder.CreateStore(ConstantFP::get(Type::getPPC_FP128Ty(Builder.getContext()), 0), operand, true);
-		       break;
-
-		    case Type::X86_MMXTyID:
-		       Store0 = Builder.CreateStore(ConstantFP::get(Type::getX86_MMXTy(Builder.getContext()), 0), operand, true);
-		       break;
-/*
-		    case Type::PointerTyID:
-		       Store0 = Builder.CreateStore(ConstantPointerNull::getType(Type::getIntN(cast<PointerType>(storage[i]->getType())->getBitWidth()), 0), operand, true);
-		       break;
-
-		    case Type::VectorTyID:
-		       Store0 = Builder.CreateStore(ConstantDataVector::get(Type::getVectorTy(Builder.getContext()), 0), operand, true);
-		       break;*/
-		 }
-
- 		 if(Store0 == nullptr){
-		    errs() << "can't do my stuff\n";
-		 }
-		 else{
-		    errs() << "adding STORE 0 (after)\t\t\t";
-		    Dloc.print(errs());
-		    errs() << "\n";
-		 }
-		 numSTORE0ADDED++;
+		 StoreInst* Store0 = addStore0(storage, i, operand);
 		 storage.push_back(Store0);
 		 return;
 	      }
@@ -154,7 +179,26 @@ namespace {
 	   --i;
 	 }
       }
-    }
+   }
+   //TODO create a STORE0 func and call it to check whether or not the previous instruction was a store 0 with the same type
+   void addLastStore(SmallVector<Instruction*, 64> &storage, Instruction &I, int k){
+      int cpt = storage.end() - storage.begin() - 1;
+      int keep = cpt;
+      Value* operand = I.getOperand(I.getNumOperands() - 1);
+      while(cpt >= k){
+	 if(operand == storage[cpt]->getOperand(storage[cpt]->getNumOperands()-1) && &I != storage[cpt]){//if the adress where the value is stored/load is the same
+	    return;
+	 }
+	 else{
+	    keep = cpt;
+	 }
+	 cpt--;
+      }
+      errs() << "Store0 needed " << *storage[k] << "\n";
+      StoreInst* Store0 = addStore0(storage, keep, operand);
+   }
+
+
  };
 }
 
