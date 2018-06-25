@@ -35,6 +35,7 @@
 #LLVM Crap
 *.ll
 *.bc
+*.s
 
 # Temporary files
 *~
