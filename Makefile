@@ -26,7 +26,7 @@ example: test/example.c
 	@sleep 2
 
 dumb:	test/dumb.c
-	$(CC) -g -emit-llvm -c -o dumb.bc $^
+	$(CC) -emit-llvm -c -o dumb.bc $^
 	$(OPT) -load $(PASS_DIR)/$(PASSLIB) $(REQUIREDPASS) $(PASS) < dumb.bc  > ./dumb_path.bc
 	$(LLVMDIS) -o dumb.ll dumb_path.bc
 	$(LLC) dumb.bc
