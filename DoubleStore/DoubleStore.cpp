@@ -56,9 +56,8 @@ namespace {
 	    }
 	    int cpt = storage.end() - storage.begin() - 1;
 	    while(cpt >= 0){
-	       if(storage[cpt]->getOpcode() == 30 || storage[cpt]->getOpcode() == 31){
-   		  addLastStore(storage, *storage[cpt], cpt);
-		  errs() << *storage[cpt]->getOperand(0) << "\n";
+     	       if(storage[cpt]->getOpcode() == 31 || storage[cpt]->getOpcode() == 30){
+		  addLastStore(storage, *storage[cpt], cpt);
 	       }
 	       cpt--;
 	    }
@@ -84,11 +83,9 @@ namespace {
       int ID = 0;
       if(storage[i]->getOpcode() == 30){
 	 ID = storage[i]->getType()->getTypeID();
-	 LoadInst *Li = dyn_cast<LoadInst>(storage[i]);
       }
       else{
 	 ID = storage[i]->getOperand(0)->getType()->getTypeID();
-	 StoreInst *SI = dyn_cast<StoreInst>(storage[i]);
       }
       switch (ID) {
 
@@ -155,16 +152,15 @@ namespace {
       unsigned int Ioperands = I.getNumOperands();
       Value* operand = I.getOperand(Ioperands - 1);
       int i = size - 1;
-      storage.push_back(&I);
+      storage.push_back(&I); 
       if(I.getOpcode() == 31){
       	 while(i >= 0){
            if(operand == storage[i]->getOperand(storage[i]->getNumOperands()-1)){//if the adress where the value is stored/load is the same
 	      if(storage[i]->getOpcode() == 31){//31 stands for store
 		 storage[i]->eraseFromParent();
 		 StoreInst *SI = dyn_cast< StoreInst >(storage[i]);
-		 DebugLoc Dloc = storage[i]->getDebugLoc();
 		 errs() << "erasing instruction\t\t\t";
-		 Dloc.print(errs());
+		 storage[i]->getDebugLoc().print(errs());
  		 errs() << "\n";
 		 storage.erase(storage.begin()+i);
 		 numSTOREDELETED++;
@@ -194,8 +190,16 @@ namespace {
 	 }
 	 cpt--;
       }
-      errs() << "Store0 needed " << *storage[k] << "\n";
-      StoreInst* Store0 = addStore0(storage, keep, operand);
+      errs() << I << "\n";
+      if(Constant *C = dyn_cast<Constant>(I.getOperand(0))){
+	 if(C->isNullValue()){
+/*	    errs() << *C << "\n";
+	    return;
+	 }
+  */    }/*
+      if(Value* V = dyn_cast<Value>(I.getOperand(0))){
+  */} 	 StoreInst* Store0 = addStore0(storage, keep, operand);
+     // }
    }
 
 
