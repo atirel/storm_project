@@ -17,14 +17,6 @@ EXEC=dumb
 
 all: $(EXEC)
 
-example: test/example.c
-	$(CC) -g -emit-llvm -c -o example.bc $^
-	$(OPT) -load $(PASS_DIR)/$(PASSLIB) $(REQUIREDPASS) $(PASS) < example.bc > ./example_path.bc
-	$(LLVMDIS) -o example.ll example_path.bc
-	$(LLC) example.bc
-	$(CC) -o $@ example.s
-	@sleep 2
-
 dumb:	test/dumb.c
 	$(CC) -emit-llvm -c -o dumb.bc $^
 	$(OPT) -load $(PASS_DIR)/$(PASSLIB) $(REQUIREDPASS) $(PASS) < dumb.bc  > ./dumb_path.bc
@@ -33,17 +25,10 @@ dumb:	test/dumb.c
 	$(CC) -o $@ dumb.s
 	@sleep 2
 
-cheeky: test/cheeky.c
-	$(CC) -g -emit-llvm -c -o cheeky.bc $^
-	$(OPT) -load $(PASS_DIR)/$(PASSLIB) $(REQUIREDPASS) $(PASS) < cheeky.bc  > ./cheeky_path.bc
-	$(LLVMDIS) -o cheeky.ll cheeky_path.bc
-	$(LLC) cheeky.bc
-	$(CC) -o $@ cheeky.s
+test: exec_test
 
-example-pass: example.c
-	$(CC) -S -emit-llvm -c -o example.ll $^
-	$(OPT) -S -loops example.ll 
-	$(OPT) -S -simplifycfg -dot-cfg -o example-after-print.ll example.ll 
+exec_test:
+	./test/test.sh
 
 clean: 
 	rm -rf *.o *.bc
