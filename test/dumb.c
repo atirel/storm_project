@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-
+/*
 int pointless(void){
    char d = 'o';
    long long int a = 2;
@@ -20,9 +20,15 @@ int pointless(void){
    c = 1.1;
    return e;
 }
-
+*/
 
 int main(){
-   pointless();
+   int a = 2;
+//   int *b = &a;
+//   int *c = b;
+   int array[2];// = {1,2};
+   a = array[0];
+   printf("%d\n", a);
+  // pointless();
    return 0;
 }

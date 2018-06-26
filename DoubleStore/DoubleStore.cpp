@@ -46,17 +46,26 @@ namespace {
    static int numSTOREDELETED;//The number of useless STORE removed
 
    DoubleStoreInstr() : ModulePass(ID) {}
+/**
+ * @function runOnModule override
+ * should also work with runOnFunction
+ * @param Module M, the current module
+ * @returns true since the code was modified in order to add the store 0 instructions
+ **/
 
    bool runOnModule(Module &M) override {
       for(Function &F : M){
+	 errs() << "\n";
          for(BasicBlock &B : F){
 	    SmallVector<Instruction*, 64> storage;
             for(Instruction &I : B){
 	       update_storage(storage, I);
 	    }
 	    int cpt = storage.end() - storage.begin() - 1;
-	    errs() << "\n\n\n";
 	    while(cpt >= 0){
+	       if(CallInst* CI = dyn_cast<CallInst>(storage[cpt])){
+   		  errs() << *CI->getCalledFunction()->stripPointerCasts() << "\n";
+	       }
      	       if(storage[cpt]->getOpcode() == 31 || storage[cpt]->getOpcode() == 30){
 		  addLastStore(storage, *storage[cpt], cpt);
 	       }
@@ -67,6 +76,12 @@ namespace {
       return true;
    }
 
+   /**
+    * This function is used to display usefull information in order to sum up what have been done by our pass
+    * @function doFinalization the last function executed by our pass
+    * @param the current module
+    * @returns false because the code wasn't modified during its execution
+    **/
    bool doFinalization(Module &M) override{
       errs() << "\n(Information are displayed in file:line:column mode)\n\n";
       errs() << "\033[0;36m======================================\033[0;0m\n";
@@ -77,9 +92,16 @@ namespace {
       return false;
    }
 
-   StoreInst* addStore0(SmallVector<Instruction*, 64> &storage, int i, Value* operand){
+   /**
+    * This function adds a store0 instruction after the instruction storage[i], it needs the operand in order to know where to store the value
+    * @param storage, the current vectore of the instructions
+    * @param i the index of the instruction where our store 0 is to be placed
+    * @param operand, the address where we need to store our value
+    * @return the new instruction, in order to ve added to the storage vector and for debug purposes
+    **/ 
+   StoreInst* addStore0(SmallVector<Instruction*, 64> &storage, int i, Value* operand, int place){
       DebugLoc Dloc = storage[i]->getDebugLoc();
-      IRBuilder<> Builder(storage[i+1]);
+      IRBuilder<> Builder(storage[place]);
       StoreInst* Store0 =  nullptr;
       int ID = 0;
       if(storage[i]->getOpcode() == 30){
@@ -88,7 +110,7 @@ namespace {
       else{
 	 ID = storage[i]->getOperand(0)->getType()->getTypeID();
       }
-      switch (ID) {
+      switch (ID) {//each case allows to check the type and store 0 type get<Typename>Ty at @operand with volatile=true in order to survive other pass
 
 	 case Type::IntegerTyID:
 	    if(storage[i]->getOpcode() == 30){
@@ -126,15 +148,21 @@ namespace {
 	 case Type::X86_MMXTyID:
 	    Store0 = Builder.CreateStore(ConstantFP::get(Type::getX86_MMXTy(Builder.getContext()), 0), operand, true);
 	    break;
-/*
-		    case Type::PointerTyID:
-		       Store0 = Builder.CreateStore(ConstantPointerNull::getType(Type::getIntN(cast<PointerType>(storage[i]->getType())->getBitWidth()), 0), operand, true);
-		       break;
 
-		    case Type::VectorTyID:
-		       Store0 = Builder.CreateStore(ConstantDataVector::get(Type::getVectorTy(Builder.getContext()), 0), operand, true);
-		       break;*/
-      }
+	 case Type::PointerTyID:
+	    if(StoreInst* SI = dyn_cast<StoreInst>(storage[i])){
+   	       Store0 = Builder.CreateStore(Constant::getNullValue(cast<PointerType>(SI->getOperand(0)->getType())), operand, true);
+	    }
+	    else{
+	       LoadInst* LI = dyn_cast<LoadInst>(storage[i]);
+   	       Store0 = Builder.CreateStore(Constant::getNullValue(cast<PointerType>(LI->getType())), operand, true);
+	    }
+	    break;
+/*
+	 case Type::VectorTyID:
+	    Store0 = Builder.CreateStore(ConstantDataVector::get(Type::getVectorTy(Builder.getContext()), 0), operand, true);
+	    break;
+  */    }
 
       if(Store0 == nullptr){
 	 errs() << "can't do my stuff\n";
@@ -147,7 +175,12 @@ namespace {
       numSTORE0ADDED++;
       return Store0;
    }
-
+   /**
+    * This function updates the vectore storage, calling if necessary the Store0 function and deleting pointless store instructions
+    * @param storage, a vector with all the instructions before the current one in the block
+    * @param I, the current instruction
+    * @returns nothing, but the instruction is added to storage and useless stores are removed, if necessary, a store 0 instruction is added at the right place
+    **/
    void update_storage(SmallVector<Instruction*, 64>& storage, Instruction &I){
       int size = storage.end() - storage.begin();
       unsigned int Ioperands = I.getNumOperands();
@@ -158,17 +191,17 @@ namespace {
       	 while(i >= 0){
            if(operand == storage[i]->getOperand(storage[i]->getNumOperands()-1)){//if the adress where the value is stored/load is the same
 	      if(storage[i]->getOpcode() == 31){//31 stands for store
-		 storage[i]->eraseFromParent();
 		 StoreInst *SI = dyn_cast< StoreInst >(storage[i]);
 		 errs() << "erasing instruction\t\t\t";
 		 storage[i]->getDebugLoc().print(errs());
  		 errs() << "\n";
-		 storage.erase(storage.begin()+i);
+		 storage[i]->eraseFromParent();
+		 storage.erase(storage.begin()+i);	 
 		 numSTOREDELETED++;
 		 return;
 	      }
 	      if(storage[i]->getOpcode() == 30){//30 stands for load
-		 StoreInst* Store0 = addStore0(storage, i, operand);
+		 StoreInst* Store0 = addStore0(storage, i, operand, i+1);
 		 storage.insert(storage.begin()+i+1, Store0);
 		 return;
 	      }
@@ -176,27 +209,47 @@ namespace {
 	   --i;
 	 }
       }
+      else{
+	 if(I.getOpcode() == 30){
+	    while(i >= 0){
+	       if(operand == storage[i]->getOperand(storage[i]->getNumOperands() - 1) && storage[i]->getOpcode() == 31){//If the variable is initialized
+		  return;//do nothing
+	       }
+	       --i;
+	    }
+	    StoreInst* SI0 = addStore0(storage, size, operand, size);
+	   // storage.insert(storage.begin()+size, SI0);
+	 }
+      }
    }
-   //TODO create a STORE0 func and call it to check whether or not the previous instruction was a store 0 with the same type
+   /**
+    * This function adds Store0 instructions at the end of compilation:
+    * If a variable is no longer of any use, we put its value to 0
+    * @param storage, a vector with all the instructions of the block
+    * @param I, the Instruction handled in order to check whether or not its the last one
+    * @param k, an index to reduce the length manipulated
+    * @returns nothing, but adds store 0 instruction for each variable which was of any use
+    **/
    void addLastStore(SmallVector<Instruction*, 64> &storage, Instruction &I, int k){
       int cpt = storage.end() - storage.begin() - 1;
       Value* operand = I.getOperand(I.getNumOperands() - 1);
       while(cpt >= k){
-	 if(operand == storage[cpt]->getOperand(storage[cpt]->getNumOperands()-1) && &I != storage[cpt]){//if the adress where the value is stored/load is the same
+	 if(operand == storage[cpt]->getOperand(storage[cpt]->getNumOperands()-1) && &I != storage[cpt]){//if the adress where the value is stored/load is the same and the instruction is not itself
 	    return;
 	 }
 	 
 	 cpt--;
       }
       if(Constant *C = dyn_cast<Constant>(I.getOperand(0))){
-	 if(C->isNullValue()){
-	    errs() << *C << "\n";
+	 if(C->isNullValue()){//Checks if the previous instruction was a store 0
 	    return;
 	 }
       }
-      if(Value* V = dyn_cast<Value>(I.getOperand(0))){
- 	 StoreInst* Store0 = addStore0(storage, k, operand);
-	 storage.push_back(Store0);
+      if(Value* V = dyn_cast<Value>(I.getOperand(0))){//asserts that the Constant cast is anihilated
+ 	 StoreInst* Store0 = addStore0(storage, k, operand, k+1);
+	 if (Store0 != nullptr){
+   	    storage.push_back(Store0);
+	 }
       }
    }
 
