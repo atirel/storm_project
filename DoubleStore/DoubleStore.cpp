@@ -55,6 +55,7 @@ namespace {
 	       update_storage(storage, I);
 	    }
 	    int cpt = storage.end() - storage.begin() - 1;
+	    errs() << "\n\n\n";
 	    while(cpt >= 0){
      	       if(storage[cpt]->getOpcode() == 31 || storage[cpt]->getOpcode() == 30){
 		  addLastStore(storage, *storage[cpt], cpt);
@@ -168,7 +169,7 @@ namespace {
 	      }
 	      if(storage[i]->getOpcode() == 30){//30 stands for load
 		 StoreInst* Store0 = addStore0(storage, i, operand);
-		 storage.push_back(Store0);
+		 storage.insert(storage.begin()+i+1, Store0);
 		 return;
 	      }
 	   }
@@ -179,27 +180,24 @@ namespace {
    //TODO create a STORE0 func and call it to check whether or not the previous instruction was a store 0 with the same type
    void addLastStore(SmallVector<Instruction*, 64> &storage, Instruction &I, int k){
       int cpt = storage.end() - storage.begin() - 1;
-      int keep = cpt;
       Value* operand = I.getOperand(I.getNumOperands() - 1);
       while(cpt >= k){
 	 if(operand == storage[cpt]->getOperand(storage[cpt]->getNumOperands()-1) && &I != storage[cpt]){//if the adress where the value is stored/load is the same
 	    return;
 	 }
-	 else{
-	    keep = cpt;
-	 }
+	 
 	 cpt--;
       }
-      errs() << I << "\n";
       if(Constant *C = dyn_cast<Constant>(I.getOperand(0))){
 	 if(C->isNullValue()){
-/*	    errs() << *C << "\n";
+	    errs() << *C << "\n";
 	    return;
 	 }
-  */    }/*
+      }
       if(Value* V = dyn_cast<Value>(I.getOperand(0))){
-  */} 	 StoreInst* Store0 = addStore0(storage, keep, operand);
-     // }
+ 	 StoreInst* Store0 = addStore0(storage, k, operand);
+	 storage.push_back(Store0);
+      }
    }
 
 
