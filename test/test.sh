@@ -17,9 +17,10 @@ function binChecker {
    fi
    echo 0
 }
+clear
 echo "Do not worry if you see useless stuff for testing purposes, the execution is written over cerrs and as far as my knowledge goes, i don't know a way to hide it while saving it"
 echo "for convention, everything will be erased before showing test results"
-echo "enter a key to continue"
+echo -e "\n\n\n\t\t\t\t\t\t\tpress a key to continue"
 read continuation
 
 let "i=1"
@@ -67,7 +68,16 @@ do
 done
 let "i-=1"
 echo -ne "\n\n\n\t\t\t\t\t\t\t Success rate: "
-echo -n $(( j * 100 / i))
-echo -e "%\n\n\n"
-#rm -f *.bc *.txt my_bc *.ll
+succesRate=$(( j * 100 / i))
+if [[ "$succesRate" -ge "75" ]]
+then
+   echo -en "\033[0;92m"
+elif [[ "$succesRate" -ge "50" ]]
+then
+   echo -en "\033[0;93m"
+else
+   echo -ne "\033[0;91m"
+fi
+echo -e "$succesRate%\n\n\n\033[0m"
+rm -f *.bc *.txt my_bc *.ll
 cd ..
