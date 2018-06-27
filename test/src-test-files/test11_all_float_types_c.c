@@ -1,3 +1,4 @@
+#include <assert.h>
 float f1(int b){
    return b;
 }
@@ -16,5 +17,6 @@ int main(){
    f1(3);
    f2();
    add(3,f2());
+   assert(0 < 0.00001);
    return 0;
 }

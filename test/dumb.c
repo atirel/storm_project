@@ -21,14 +21,15 @@ int pointless(void){
    return e;
 }
 */
+static int ANSWER = 42;
 
 int main(){
-   int a = 2;
+   int a = ANSWER;
 //   int *b = &a;
 //   int *c = b;
-   int array[2];// = {1,2};
-   a = array[0];
-   printf("%d\n", a);
+   int array[2] = {450};
+   printf("%d %d\n", a, array[1]);
+   array[0] = 2;
   // pointless();
    return 0;
 }
