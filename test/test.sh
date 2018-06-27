@@ -68,16 +68,16 @@ do
 done
 let "i-=1"
 echo -ne "\n\n\n\t\t\t\t\t\t\t Success rate: "
-succesRate=$(( j * 100 / i))
-if [[ "$succesRate" -ge "75" ]]
+succesRate=$(( j * 10000 / i))
+if [[ "$succesRate" -ge "7500" ]]
 then
    echo -en "\033[0;92m"
-elif [[ "$succesRate" -ge "50" ]]
+elif [[ "$succesRate" -ge "5000" ]]
 then
    echo -en "\033[0;93m"
 else
    echo -ne "\033[0;91m"
 fi
-echo -e "$succesRate%\n\n\n\033[0m"
-rm -f *.bc *.txt my_bc *.ll
+echo -e "$(( succesRate / 100)).$(( succesRate % 100))%\n\n\n\033[0m"
+rm -f *.bc my_bc *.ll *.txt
 cd ..
