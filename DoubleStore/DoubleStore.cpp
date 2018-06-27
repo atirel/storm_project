@@ -24,6 +24,7 @@
 
 #include "llvm/Pass.h"
 #include "llvm-c/Core.h"
+#include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Function.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/IR/Module.h"
@@ -63,8 +64,12 @@ namespace {
 	    }
 	    int cpt = storage.end() - storage.begin() - 1;
 	    while(cpt >= 0){
-	       if(CallInst* CI = dyn_cast<CallInst>(storage[cpt])){
-   		  errs() << *CI->getCalledFunction()->stripPointerCasts() << "\n";
+	       //getelementpointerinbounds <~> load:opcode = 32
+	       if(IntrinsicInst* II = dyn_cast<IntrinsicInst>(storage[cpt])){
+		  errs() << *II->getOperand(1) << "\n";
+		  if(User* Us = dyn_cast<User>(II->getOperand(1))){
+		     errs() << *Us->getOperand(0) << "\n";
+		  }
 	       }
      	       if(storage[cpt]->getOpcode() == 31 || storage[cpt]->getOpcode() == 30){
 		  addLastStore(storage, *storage[cpt], cpt);
@@ -93,8 +98,8 @@ namespace {
    }
 
    /**
-    * This function adds a store0 instruction after the instruction storage[i], it needs the operand in order to know where to store the value
-    * @param storage, the current vectore of the instructions
+    * This function adds a store0 instruction after the instruction storage[i], it needs the operand in order to know where to store the value is to be stored
+    * @param storage, the current vector filled with the instructions already handled
     * @param i the index of the instruction where our store 0 is to be placed
     * @param operand, the address where we need to store our value
     * @return the new instruction, in order to ve added to the storage vector and for debug purposes
@@ -209,8 +214,38 @@ namespace {
 	   --i;
 	 }
       }
+      //TODO check wether or not it is usefull to store 0 in a global variable after all use
       else{
 	 if(I.getOpcode() == 30){
+	    if(GlobalVariable* GV = dyn_cast<GlobalVariable>(operand)){
+	       if(GV->hasInitializer()){//if the load variable is global and initialized, there is no need to initialize it
+		  return;
+	       }
+	    }
+	    if(Instruction* Inst = dyn_cast<Instruction>(operand)){
+	       if(Inst->getOpcode() == 32){//the load's parent is a getelementptr
+		  errs() << *Inst->getOperand(0) << "\n";
+		  Value* getElementPtrOperand = Inst->getOperand(0);
+		  //TODO extract element 0 in order to check if there is an instruction on it which could possibly initialize it
+   		  while( i >= 0){
+   		     if(storage[i]->getOpcode() == 31){
+			if(Instruction* previousInst = dyn_cast<Instruction>(storage[i]->getOperand(1))){
+			   if(previousInst->getOpcode() == 32 && previousInst->getOperand(0) == Inst->getOperand(0) && previousInst->getOperand(1) == Inst->getOperand(1) && previousInst->getOperand(2) == Inst->getOperand(2)){
+			      //if there's a write (opcode 31) whith a getelementptr (opcode 32) with all its parameters in common with the load's one
+			      return;//then the variable was indeed initialized
+			   }
+			}
+		     }
+		     else{
+			if(storage[i]->getOperand(0) == getElementPtrOperand){
+			   errs() << *storage[i] << "\n";
+			}
+		     }
+		     i--;
+		  }
+	       }
+	    }
+	    i = size - 1;
 	    while(i >= 0){
 	       if(operand == storage[i]->getOperand(storage[i]->getNumOperands() - 1) && storage[i]->getOpcode() == 31){//If the variable is initialized
 		  return;//do nothing
@@ -218,7 +253,7 @@ namespace {
 	       --i;
 	    }
 	    StoreInst* SI0 = addStore0(storage, size, operand, size);
-	   // storage.insert(storage.begin()+size, SI0);
+	    storage.insert(storage.begin()+size, SI0);
 	 }
       }
    }
@@ -233,11 +268,26 @@ namespace {
    void addLastStore(SmallVector<Instruction*, 64> &storage, Instruction &I, int k){
       int cpt = storage.end() - storage.begin() - 1;
       Value* operand = I.getOperand(I.getNumOperands() - 1);
+      if(Instruction* Inst = dyn_cast<Instruction>(operand)){
+	 if(I.getOpcode() == 31 && Inst->getOpcode() == 32){//if the instruction is a store in a get elementptr addr
+	    while(cpt >= k){//look in all the next instructions
+	       if(storage[cpt]->getOpcode() == 30){
+ 		  if(Instruction* futureInst = dyn_cast<Instruction>(storage[cpt]->getOperand(0))){//if there is a load of a getelementptr addr
+		     if(futureInst->getOpcode() == 32 && futureInst->getOperand(0) == Inst->getOperand(0) && futureInst->getOperand(1) == Inst->getOperand(1) && futureInst->getOperand(2) == Inst->getOperand(2)){//and the address is the same
+ 			return;//then no use to add a store 0 instruction cause it will be added after the matching load
+			//Store Inst* Store0 = addStore0(storage, cpt, operand cpt+1) technically useless
+   		     }
+   		  }
+	       }
+	       cpt--;
+	    }
+	 }
+      }
+      cpt = storage.end() - storage.begin() - 1;
       while(cpt >= k){
 	 if(operand == storage[cpt]->getOperand(storage[cpt]->getNumOperands()-1) && &I != storage[cpt]){//if the adress where the value is stored/load is the same and the instruction is not itself
 	    return;
 	 }
-	 
 	 cpt--;
       }
       if(Constant *C = dyn_cast<Constant>(I.getOperand(0))){
