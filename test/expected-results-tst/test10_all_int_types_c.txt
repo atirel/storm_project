@@ -1,0 +1,67 @@
+source_filename = "test10_all_int_types_c.c"
+target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
+target triple = "x86_64-unknown-linux-gnu"
+
+; Function Attrs: nounwind uwtable
+define i64 @f1() #0 {
+  ret i64 30
+}
+
+; Function Attrs: nounwind uwtable
+define i64 @f2() #0 {
+  ret i64 12
+}
+
+; Function Attrs: nounwind uwtable
+define signext i16 @f3() #0 {
+  ret i16 8
+}
+
+; Function Attrs: nounwind uwtable
+define zeroext i16 @f4() #0 {
+  ret i16 200
+}
+
+; Function Attrs: nounwind uwtable
+define i32 @f5() #0 {
+  ret i32 42
+}
+
+; Function Attrs: nounwind uwtable
+define i64 @f6() #0 {
+  ret i64 -15
+}
+
+; Function Attrs: nounwind uwtable
+define i32 @main() #0 {
+  %1 = alloca i32, align 4
+  %2 = alloca i64, align 8
+  %3 = alloca i32, align 4
+  %4 = alloca i64, align 8
+  store i32 0, i32* %1, align 4
+  %5 = call i64 @f1()
+  %6 = call i64 @f2()
+  %7 = call signext i16 @f3()
+  %8 = sext i16 %7 to i64
+  %9 = call zeroext i16 @f4()
+  %10 = zext i16 %9 to i64
+  store i64 %10, i64* %2, align 8
+  store volatile i64 0, i64* %2
+  %11 = call i32 @f5()
+  store i32 %11, i32* %3, align 4
+  %12 = call i64 @f6()
+  %13 = load i32, i32* %3, align 4
+  store volatile i32 0, i32* %3
+  %14 = zext i32 %13 to i64
+  %15 = add nsw i64 %12, %14
+  %16 = call i64 @f1()
+  store i64 %16, i64* %4, align 8
+  store volatile i64 0, i64* %4
+  ret i32 0
+}
+
+attributes #0 = { nounwind uwtable "disable-tail-calls"="false" "less-precise-fpmad"="false" "no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "no-infs-fp-math"="false" "no-jump-tables"="false" "no-nans-fp-math"="false" "no-signed-zeros-fp-math"="false" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+fxsr,+mmx,+sse,+sse2,+x87" "unsafe-fp-math"="false" "use-soft-float"="false" }
+
+!llvm.ident = !{!0}
+
+!0 = !{!"clang version 3.9.1 (tags/RELEASE_391/final 334690)"}
