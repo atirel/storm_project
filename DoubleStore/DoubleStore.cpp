@@ -64,6 +64,7 @@ namespace {
 	       storage.push_back(&I);
 	    }
             for(Instruction &I : B){
+	       errs() << I << " " << I.getOpcode() << "\n";
 	       update_storage(storage, I, cpt);
 	       cpt++;
 	    }
@@ -78,6 +79,7 @@ namespace {
 		  }
 	       }
      	       if(storage[cpt]->getOpcode() == 31 || storage[cpt]->getOpcode() == 30){
+		  errs() << *storage[cpt] << "\n";
 		  addLastStore(storage, *storage[cpt], cpt);
 	       }
 	       cpt--;
@@ -203,6 +205,9 @@ namespace {
       //storage.push_back(&I); 
       if(I.getOpcode() == 31){
       	 while(i >= 0){
+	    if(storage[i]->getNumOperands() == 0){
+	       return;
+	    }
            if(operand == storage[i]->getOperand(storage[i]->getNumOperands()-1)){//if the adress where the value is stored/load is the same
 	      if(storage[i]->getOpcode() == 31){//31 stands for store
 		 StoreInst *SI = dyn_cast< StoreInst >(storage[i]);
@@ -247,7 +252,7 @@ namespace {
 			}
 		     }
 		     else{
-			if(storage[i]->getOperand(0) == getElementPtrOperand){
+			if(storage[i]->getNumOperands() != 0 && storage[i]->getOperand(0) == getElementPtrOperand){
 			   if(storage[i]->getOpcode() == 47){//if there was a bitcast before, check that it did not create a pointer to initialized value
 			      int k = i + 1;
 			      while ( k < size){
@@ -268,7 +273,7 @@ namespace {
 	    }
 	    i = size - 1;
 	    while(i >= 0){
-	       if(operand == storage[i]->getOperand(storage[i]->getNumOperands() - 1) && storage[i]->getOpcode() == 31){//If the variable is initialized
+	       if(storage[i]->getNumOperands() != 0 && operand == storage[i]->getOperand(storage[i]->getNumOperands() - 1) && storage[i]->getOpcode() == 31){//If the variable is initialized
 		  return;//do nothing
 	       }
 	       --i;
@@ -294,11 +299,19 @@ namespace {
 	 if(I.getOpcode() == 31 && Inst->getOpcode() == 32){//if the instruction is a store in a get elementptr addr
 	    while(cpt >= k){//look in all the next instructions
 	       if(storage[cpt]->getOpcode() == 30){
- 		  if(Instruction* futureInst = dyn_cast<Instruction>(storage[cpt]->getOperand(0))){//if there is a load of a getelementptr addr
-		     if(futureInst->getOpcode() == 32 && futureInst->getOperand(0) == Inst->getOperand(0) && futureInst->getOperand(1) == Inst->getOperand(1) && futureInst->getOperand(2) == Inst->getOperand(2)){//and the address is the same
- 			return;//then no use to add a store 0 instruction cause it will be added after the matching load
+		     if(Instruction* futureInst = dyn_cast<Instruction>(storage[cpt]->getOperand(0))){//if there is a load of a getelementptr addr
+			if(futureInst->getOpcode() == 32){
+			   bool allEqual = true;
+			   int numOperands = futureInst->getNumOperands() - 1;
+			   while(numOperands >= 0){
+			      allEqual |= futureInst->getOperand(numOperands) == Inst->getOperand(numOperands);
+			      numOperands--;
+			   }
+			   if(allEqual){//and the address is the same
+			      return;//then no use to add a store 0 instruction cause it will be added after the matching load
 			//Store Inst* Store0 = addStore0(storage, cpt, operand cpt+1) technically useless
    		     }
+			}
    		  }
 	       }
 	       cpt--;
@@ -307,7 +320,7 @@ namespace {
       }
       cpt = storage.end() - storage.begin() - 1;
       while(cpt >= k){
-	 if(operand == storage[cpt]->getOperand(storage[cpt]->getNumOperands()-1) && &I != storage[cpt]){//if the adress where the value is stored/load is the same and the instruction is not itself
+	 if(storage[cpt]->getNumOperands() != 0 && operand == storage[cpt]->getOperand(storage[cpt]->getNumOperands()-1) && &I != storage[cpt]){//if the adress where the value is stored/load is the same and the instruction is not itself
 	    return;
 	 }
 	 cpt--;
@@ -317,6 +330,30 @@ namespace {
 	    return;
 	 }
       }
+      cpt = storage.end() - storage.begin() - 1;
+      while(cpt >= k){
+	 if(storage[cpt]->getOpcode() == 2){//if there is a jump between variables
+	    errs() << storage[cpt]->getNumOperands() << "\n";
+	    /*Instruction* labelInstruction = dyn_cast<Instruction>(storage[cpt]->getOperand(0));//get the address to jump
+	    int goingThrough = 0;
+	    while(goingThrough < cpt && storage[goingThrough] != labelInstruction){
+	       goingThrough++;
+	    }
+	    if(storage[goingThrough] != labelInstruction){
+	       errs() << "errEEEEEEEEUUUUUUUUUURRRR\n";
+	    }
+	    else{
+	       while(goingThrough < cpt){
+		  if(storage[goingThrough]->getNumOperands() != 0 && storage[goingThrough]->getOperand(storage[goingThrough]->getNumOperands() -1) == operand){
+		     return;
+		  }
+		  goingThrough++;
+	       }
+	    }*/
+	 }
+	 cpt--;
+      }
+
       if(Value* V = dyn_cast<Value>(I.getOperand(0))){//asserts that the Constant cast is anihilated
  	 StoreInst* Store0 = addStore0(storage, k, operand, k+1);
 	 if (Store0 != nullptr){
