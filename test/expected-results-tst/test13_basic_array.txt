@@ -1,10 +1,10 @@
-source_filename = "test01_basic_array.c"
+source_filename = "test13_basic_array.c"
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
 
 @main.array = private unnamed_addr constant [3 x i32] [i32 1, i32 2, i32 3], align 4
 @.str = private unnamed_addr constant [7 x i8] c"a == 1\00", align 1
-@.str.1 = private unnamed_addr constant [21 x i8] c"test01_basic_array.c\00", align 1
+@.str.1 = private unnamed_addr constant [21 x i8] c"test13_basic_array.c\00", align 1
 @__PRETTY_FUNCTION__.main = private unnamed_addr constant [11 x i8] c"int main()\00", align 1
 @.str.2 = private unnamed_addr constant [7 x i8] c"b == 2\00", align 1
 @.str.3 = private unnamed_addr constant [7 x i8] c"c == 3\00", align 1
