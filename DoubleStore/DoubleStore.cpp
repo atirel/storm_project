@@ -57,18 +57,24 @@ namespace {
    bool runOnModule(Module &M) override {
       for(Function &F : M){
 	 errs() << "\n";
+	 SmallVector<Instruction*, 64> storage;
+	 int cpt = 0;
          for(BasicBlock &B : F){
-	    SmallVector<Instruction*, 64> storage;
-            for(Instruction &I : B){
-	       update_storage(storage, I);
+	    for(Instruction &I : B){
+	       storage.push_back(&I);
 	    }
-	    int cpt = storage.end() - storage.begin() - 1;
+            for(Instruction &I : B){
+	       update_storage(storage, I, cpt);
+	       cpt++;
+	    }
+	 }
+	 cpt--;
 	    while(cpt >= 0){
 	       //getelementpointerinbounds <~> load:opcode = 32
-	       if(IntrinsicInst* II = dyn_cast<IntrinsicInst>(storage[cpt])){
-		  errs() << *II->getOperand(1) << "\n";
+	       if(IntrinsicInst* II = dyn_cast<IntrinsicInst>(storage[cpt])){//Call void func for memory management //here memcpy in dumb.c
+		  errs() << *II->getOperand(1) << "\n";//In case od memcpy, displays the location of the source of the memory
 		  if(User* Us = dyn_cast<User>(II->getOperand(1))){
-		     errs() << *Us->getOperand(0) << "\n";
+		     errs() << *Us->getOperand(0) << "\n";//displays the source variable information
 		  }
 	       }
      	       if(storage[cpt]->getOpcode() == 31 || storage[cpt]->getOpcode() == 30){
@@ -76,7 +82,7 @@ namespace {
 	       }
 	       cpt--;
 	    }
-  	 }
+
       }
       return true;
    }
@@ -186,12 +192,15 @@ namespace {
     * @param I, the current instruction
     * @returns nothing, but the instruction is added to storage and useless stores are removed, if necessary, a store 0 instruction is added at the right place
     **/
-   void update_storage(SmallVector<Instruction*, 64>& storage, Instruction &I){
-      int size = storage.end() - storage.begin();
+   void update_storage(SmallVector<Instruction*, 64>& storage, Instruction &I, int &size){
+      //int size = storage.end() - storage.begin();
+      if(I.getNumOperands() == 0){
+	 return;
+      }
       unsigned int Ioperands = I.getNumOperands();
       Value* operand = I.getOperand(Ioperands - 1);
       int i = size - 1;
-      storage.push_back(&I); 
+      //storage.push_back(&I); 
       if(I.getOpcode() == 31){
       	 while(i >= 0){
            if(operand == storage[i]->getOperand(storage[i]->getNumOperands()-1)){//if the adress where the value is stored/load is the same
@@ -202,12 +211,14 @@ namespace {
  		 errs() << "\n";
 		 storage[i]->eraseFromParent();
 		 storage.erase(storage.begin()+i);	 
+		 size--;
 		 numSTOREDELETED++;
 		 return;
 	      }
 	      if(storage[i]->getOpcode() == 30){//30 stands for load
 		 StoreInst* Store0 = addStore0(storage, i, operand, i+1);
 		 storage.insert(storage.begin()+i+1, Store0);
+		 size++;
 		 return;
 	      }
 	   }
@@ -224,7 +235,6 @@ namespace {
 	    }
 	    if(Instruction* Inst = dyn_cast<Instruction>(operand)){
 	       if(Inst->getOpcode() == 32){//the load's parent is a getelementptr
-		  errs() << *Inst->getOperand(0) << "\n";
 		  Value* getElementPtrOperand = Inst->getOperand(0);
 		  //TODO extract element 0 in order to check if there is an instruction on it which could possibly initialize it
    		  while( i >= 0){
@@ -238,7 +248,18 @@ namespace {
 		     }
 		     else{
 			if(storage[i]->getOperand(0) == getElementPtrOperand){
-			   errs() << *storage[i] << "\n";
+			   if(storage[i]->getOpcode() == 47){//if there was a bitcast before, check that it did not create a pointer to initialized value
+			      int k = i + 1;
+			      while ( k < size){
+				 int numOperands = storage[k]->getNumOperands(), j;
+				 for(j = 0; j < numOperands;++j){
+				    if(storage[k]->getOperand(j) == storage[i]->getOperand(0)){
+				       return;
+				    }
+				 }
+				 ++k;
+			      }
+			   }
 			}
 		     }
 		     i--;
@@ -254,6 +275,7 @@ namespace {
 	    }
 	    StoreInst* SI0 = addStore0(storage, size, operand, size);
 	    storage.insert(storage.begin()+size, SI0);
+	    size++;
 	 }
       }
    }
