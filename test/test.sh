@@ -6,6 +6,7 @@ function binGenerator {
    clang -emit-llvm -c -o $1.bc $1.c
    opt -load ~/storm/llvm-joujou/test/storm_project/build/DoubleStore/LLVMDoubleStore.so -DoubleStore < $1.bc > $2.bc 
    llvm-dis -o $1.ll $2.bc
+   llc $2.bc
    cat $1.ll | grep -v "ModuleID" > $1.txt
 }
 
@@ -84,7 +85,7 @@ function fatalDisplayer {
 }
 
 function ultimateCleaner {
-   rm -f $1/*.ll $1/*.txt $1/*.bc $1/*.s
+   rm -f $1/*.ll $1/*.txt $1/*.bc
 }
 
 clear
@@ -107,5 +108,5 @@ ultimateCleaner `pwd`
 cd ../c_array_tests
 printf "\n\n\t\t%*s\n\n" $[COLS/2] " Testing more complex C programs with cond and arrays"
 fatalDisplayer
-#ultimateCleaner `pwd`
+ultimateCleaner `pwd`
 cd ..
