@@ -23,7 +23,6 @@ dumb:	test/dumb.c
 	$(LLVMDIS) -o dumb.ll dumb_path.bc
 	$(LLC) dumb_path.bc
 	$(CC) -o $@ dumb_path.s
-	@sleep 2
 
 test: exec_test
 
