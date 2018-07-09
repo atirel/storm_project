@@ -1,6 +1,7 @@
 /**
  * This LLVM pass deletes useless stores e.g store which are followed by another store
  * It also adds a STORE 0 %add after a load followed by a store in order to check with their values wether or not 2 variables are semantically equivalent
+ * It should be used after the dse pass since it reduces significally the number of instructions to handle.
  * @author INRIA Bordeaux STORM Project Team
  **/
 
@@ -22,20 +23,10 @@
 
 
 
-#include "llvm/Pass.h"
-#include "llvm-c/Core.h"
-#include "llvm/IR/IntrinsicInst.h"
-#include "llvm/IR/Function.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/IR/Module.h"
-#include "llvm/IR/Instructions.h"
 #include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/LLVMContext.h"
-#include "llvm/IR/Value.h"
 #include "llvm/ADT/SmallVector.h"
-#include <cstring>
-#include <stdio.h>
-#include <vector>
 
 using namespace llvm;
 
@@ -56,33 +47,53 @@ namespace {
 
    bool runOnModule(Module &M) override {
       for(Function &F : M){
-	 errs() << "\n";
 	 SmallVector<Instruction*, 64> storage;
-	 int cpt = 0;
+	 int cpt1 = 0;
+	 int cpt2 = 0;
+	 bool addStoreSize = false;
+	 int arraySize = 0;
          for(BasicBlock &B : F){
 	    for(Instruction &I : B){
 	       storage.push_back(&I);
+	       cpt1++;
+	       //loop handler, still not perfectly operational
+	       /*
+	       if(addStoreSize){
+		     IRBuilder<> Builder(storage[cpt1-1]);
+		     auto* Alloc = Builder.CreateAlloca(Type::getInt64Ty(Builder.getContext()), nullptr);
+		     StoreInst* storeSize = Builder.CreateStore(ConstantInt::get(Type::getInt64Ty(Builder.getContext()), arraySize), Alloc, true);
+		     storage.pop_back();
+		     storage.push_back(Alloc);
+		     storage.push_back(storeSize);
+		     storage.push_back(&I);
+		     addStoreSize = false;
+	       }
+	       if(AllocaInst* Alloc = dyn_cast<AllocaInst>(&I)){
+		  if(SequentialType *Seq = dyn_cast<SequentialType>(Alloc->getAllocatedType())){
+		     addStoreSize = true;
+		     arraySize = Seq->getArrayNumElements();
+		  }
+	       }
+*/
 	    }
             for(Instruction &I : B){
-	       errs() << I << " " << I.getOpcode() << "\n";
-	       update_storage(storage, I, cpt);
-	       cpt++;
+	       update_storage(storage, I, cpt2);
+	       cpt2++;
 	    }
 	 }
-	 cpt--;
-	    while(cpt >= 0){
+	 cpt2--;
+	    while(cpt2 >= 0){
 	       //getelementpointerinbounds <~> load:opcode = 32
-	       if(IntrinsicInst* II = dyn_cast<IntrinsicInst>(storage[cpt])){//Call void func for memory management //here memcpy in dumb.c
+	      /* if(IntrinsicInst* II = dyn_cast<IntrinsicInst>(storage[cpt])){//Call void func for memory management //here memcpy in dumb.c
 		  errs() << *II->getOperand(1) << "\n";//In case od memcpy, displays the location of the source of the memory
 		  if(User* Us = dyn_cast<User>(II->getOperand(1))){
 		     errs() << *Us->getOperand(0) << "\n";//displays the source variable information
 		  }
+	       }*/
+     	       if(storage[cpt2]->getOpcode() == 31 || storage[cpt2]->getOpcode() == 30){
+		  addLastStore(storage, *storage[cpt2], cpt2);
 	       }
-     	       if(storage[cpt]->getOpcode() == 31 || storage[cpt]->getOpcode() == 30){
-		  errs() << *storage[cpt] << "\n";
-		  addLastStore(storage, *storage[cpt], cpt);
-	       }
-	       cpt--;
+	       cpt2--;
 	    }
 
       }
@@ -106,9 +117,10 @@ namespace {
    }
 
    /**
-    * This function adds a store0 instruction after the instruction storage[i], it needs the operand in order to know where to store the value is to be stored
+    * This function adds a store0 instruction after the instruction storage[i], it needs the operand in order to know where to store the value
     * @param storage, the current vector filled with the instructions already handled
-    * @param i the index of the instruction where our store 0 is to be placed
+    * @param i the index of the instruction with the type of our store 0 
+    * @param place, the index where the instruction is to be placed
     * @param operand, the address where we need to store our value
     * @return the new instruction, in order to ve added to the storage vector and for debug purposes
     **/ 
@@ -188,6 +200,12 @@ namespace {
       numSTORE0ADDED++;
       return Store0;
    }
+/*
+   Instruction* getArraySizeStore(SmallVector<Instruction*, 64>& storage, Value operand){
+      int count = storage.end() - storage.begin() - 1;
+      while(count){
+	 if(storage[count]->getOpcode == 31 && storage[count]->getOperand(1) == operand){
+*/	    
    /**
     * This function updates the vectore storage, calling if necessary the Store0 function and deleting pointless store instructions
     * @param storage, a vector with all the instructions before the current one in the block
@@ -195,14 +213,12 @@ namespace {
     * @returns nothing, but the instruction is added to storage and useless stores are removed, if necessary, a store 0 instruction is added at the right place
     **/
    void update_storage(SmallVector<Instruction*, 64>& storage, Instruction &I, int &size){
-      //int size = storage.end() - storage.begin();
       if(I.getNumOperands() == 0){
 	 return;
       }
       unsigned int Ioperands = I.getNumOperands();
       Value* operand = I.getOperand(Ioperands - 1);
       int i = size - 1;
-      //storage.push_back(&I); 
       if(I.getOpcode() == 31){
       	 while(i >= 0){
 	    if(storage[i]->getNumOperands() == 0){
@@ -210,17 +226,22 @@ namespace {
 	    }
            if(operand == storage[i]->getOperand(storage[i]->getNumOperands()-1)){//if the adress where the value is stored/load is the same
 	      if(storage[i]->getOpcode() == 31){//31 stands for store
-		 StoreInst *SI = dyn_cast< StoreInst >(storage[i]);
-		 errs() << "erasing instruction\t\t\t";
-		 storage[i]->getDebugLoc().print(errs());
- 		 errs() << "\n";
-		 storage[i]->eraseFromParent();
-		 storage.erase(storage.begin()+i);	 
-		 size--;
-		 numSTOREDELETED++;
-		 return;
+		 Instruction *SI = dyn_cast<Instruction>(storage[i]);
+		 if(storage[i]->getParent() == I.getParent()){
+   		    errs() << "erasing instruction\t\t\t";
+   		    SI->getDebugLoc().print(errs());
+   		    errs() << "\n";
+   		    storage[i]->eraseFromParent();
+   		    storage.erase(storage.begin()+i);	 
+   		    size--;
+   		    numSTOREDELETED++;
+		 }
+   		 return;
 	      }
 	      if(storage[i]->getOpcode() == 30){//30 stands for load
+		 if(GlobalVariable* GV = dyn_cast<GlobalVariable>(operand)){
+		    return;
+		 }
 		 StoreInst* Store0 = addStore0(storage, i, operand, i+1);
 		 storage.insert(storage.begin()+i+1, Store0);
 		 size++;
@@ -233,7 +254,8 @@ namespace {
       //TODO check wether or not it is usefull to store 0 in a global variable after all use
       else{
 	 if(I.getOpcode() == 30){
-	    if(GlobalVariable* GV = dyn_cast<GlobalVariable>(operand)){
+	    if(GlobalVariable* GV = dyn_cast<GlobalVariable>(operand)){ 
+	       return;
 	       if(GV->hasInitializer()){//if the load variable is global and initialized, there is no need to initialize it
 		  return;
 	       }
@@ -241,7 +263,11 @@ namespace {
 	    if(Instruction* Inst = dyn_cast<Instruction>(operand)){
 	       if(Inst->getOpcode() == 32){//the load's parent is a getelementptr
 		  Value* getElementPtrOperand = Inst->getOperand(0);
-		  //TODO extract element 0 in order to check if there is an instruction on it which could possibly initialize it
+		  if(AllocaInst* arrayData = dyn_cast<AllocaInst>(getElementPtrOperand)){
+		     SequentialType *Seq = dyn_cast<SequentialType>(arrayData->getAllocatedType());
+		     int arraySize =  Seq->getArrayNumElements();
+	     	     User* accessPlace = dyn_cast<User>(Inst->getOperand(2));
+  		  }
    		  while( i >= 0){
    		     if(storage[i]->getOpcode() == 31){
 			if(Instruction* previousInst = dyn_cast<Instruction>(storage[i]->getOperand(1))){
@@ -332,28 +358,28 @@ namespace {
       }
       cpt = storage.end() - storage.begin() - 1;
       while(cpt >= k){
-	 if(storage[cpt]->getOpcode() == 2){//if there is a jump between variables
-	    errs() << storage[cpt]->getNumOperands() << "\n";
-	    /*Instruction* labelInstruction = dyn_cast<Instruction>(storage[cpt]->getOperand(0));//get the address to jump
-	    int goingThrough = 0;
-	    while(goingThrough < cpt && storage[goingThrough] != labelInstruction){
-	       goingThrough++;
+	 if(storage[cpt]->getOpcode() == 2){//if there is a jump between instructions
+	    //The "unconditionnal jumps" (enter in a do while loop or even enter in the comparison block) only have 1 operand while the conditionnal ones have 3 (test, if true, if false)
+	    int type_label = storage[cpt]->getNumOperands();
+	    if(type_label == 1){
+	       Value* labelOperandToGo = storage[cpt]->getOperand(0);//get the address to jump if true
+	       if(BasicBlock* BINP = dyn_cast<BasicBlock>(labelOperandToGo)){
+		  for(Instruction &INP : *BINP){
+		     if(INP.getOpcode() == 30 && INP.getOperand(0) == operand){
+			StoreInst* Store0 = addStore0(storage, k, operand, cpt+1);
+			return;
+		     }
+		  }			
+	       } 
 	    }
-	    if(storage[goingThrough] != labelInstruction){
-	       errs() << "errEEEEEEEEUUUUUUUUUURRRR\n";
-	    }
-	    else{
-	       while(goingThrough < cpt){
-		  if(storage[goingThrough]->getNumOperands() != 0 && storage[goingThrough]->getOperand(storage[goingThrough]->getNumOperands() -1) == operand){
-		     return;
-		  }
-		  goingThrough++;
-	       }
-	    }*/
 	 }
 	 cpt--;
       }
-
+      /*
+      if(GlobalVariable* GV = dyn_cast<GlobalVariable>(operand)){
+	 return;
+      }
+*/
       if(Value* V = dyn_cast<Value>(I.getOperand(0))){//asserts that the Constant cast is anihilated
  	 StoreInst* Store0 = addStore0(storage, k, operand, k+1);
 	 if (Store0 != nullptr){
