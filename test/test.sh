@@ -28,6 +28,7 @@ function binChecker {
 
 SUC=`echo -e "\033[0;92mSUCCESS\033[0m"`
 FAIL=`echo -e "\033[0;91mFAILURE\033[0m"`
+NOTFOUND=`echo -e "\t\033[1;94m Test Not Found\033[0m"`
 
 function fatalTestor {
    let "i=1"
@@ -59,8 +60,7 @@ function fatalDisplayer {
    	    let "j+=1"
 	 elif [[ "$a" == "2" ]]
 	 then
-	    printf "\ttest not found\n"
-	    exit 0
+	    printf "%*s" $[$COLS/2-sizename] "$NOTFOUND"
 	 else
    	    printf "%*s" $[$COLS/2-sizename] "$FAIL"
    	 fi
@@ -81,7 +81,7 @@ function fatalDisplayer {
       echo -ne "\033[0;91m"
    fi
    echo -e "$(( successRate / 100)).$(( successRate % 100))%\n\n\n\033[0m"
-   rm -f *.bc my_bc *.ll
+   rm -f *.bc my_bc *.ll *.s
 }
 
 function ultimateCleaner {
@@ -104,9 +104,9 @@ clear
 printf "\n\n\t\t%*s\n\n" $[$COLS/2] "Testing basic C functions without condition or loop or array"
 cd ../basic_c_tests
 fatalDisplayer
-ultimateCleaner `pwd`
+ultimateCleaner .
 cd ../c_array_tests
 printf "\n\n\t\t%*s\n\n" $[COLS/2] " Testing more complex C programs with cond and arrays"
 fatalDisplayer
-ultimateCleaner `pwd`
+ultimateCleaner .
 cd ..
