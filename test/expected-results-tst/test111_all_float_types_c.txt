@@ -1,43 +1,46 @@
-source_filename = "test09_fun_call_long.c"
+source_filename = "test111_all_float_types_c.c"
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
 
 ; Function Attrs: nounwind uwtable
-define i64 @f1() #0 {
-  %1 = alloca i64, align 8
-  store i64 10000000, i64* %1, align 8
-  %2 = load i64, i64* %1, align 8
-  store volatile i64 0, i64* %1
-  ret i64 %2
-}
-
-; Function Attrs: nounwind uwtable
-define i64 @f2(i32) #0 {
+define float @f1(i32) #0 {
   %2 = alloca i32, align 4
   store i32 %0, i32* %2, align 4
   %3 = load i32, i32* %2, align 4
   store volatile i32 0, i32* %2
-  %4 = sext i32 %3 to i64
-  ret i64 %4
+  %4 = sitofp i32 %3 to float
+  ret float %4
+}
+
+; Function Attrs: nounwind uwtable
+define float @f2() #0 {
+  ret float 0x3FF3333340000000
+}
+
+; Function Attrs: nounwind uwtable
+define double @add(i32, float) #0 {
+  %3 = alloca i32, align 4
+  %4 = alloca float, align 4
+  store i32 %0, i32* %3, align 4
+  store float %1, float* %4, align 4
+  %5 = load i32, i32* %3, align 4
+  store volatile i32 0, i32* %3
+  %6 = sitofp i32 %5 to float
+  %7 = load float, float* %4, align 4
+  store volatile float 0.000000e+00, float* %4
+  %8 = fadd float %6, %7
+  %9 = fpext float %8 to double
+  ret double %9
 }
 
 ; Function Attrs: nounwind uwtable
 define i32 @main() #0 {
   %1 = alloca i32, align 4
-  %2 = alloca i64, align 8
-  %3 = alloca i32, align 4
   store i32 0, i32* %1, align 4
-  %4 = call i64 @f1()
-  store i64 %4, i64* %2, align 8
-  store i32 1, i32* %3, align 4
-  %5 = load i32, i32* %3, align 4
-  store volatile i32 0, i32* %3
-  %6 = call i64 @f2(i32 %5)
-  %7 = load i64, i64* %2, align 8
-  store volatile i64 0, i64* %2
-  %8 = sdiv i64 %7, 2
-  store i64 %8, i64* %2, align 8
-  store volatile i64 0, i64* %2
+  %2 = call float @f1(i32 3)
+  %3 = call float @f2()
+  %4 = call float @f2()
+  %5 = call double @add(i32 3, float %4)
   ret i32 0
 }
 

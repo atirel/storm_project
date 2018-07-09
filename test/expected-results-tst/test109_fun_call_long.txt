@@ -1,39 +1,43 @@
-source_filename = "test08_char_load_linked_fun_call_c.c"
+source_filename = "test109_fun_call_long.c"
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
 
 ; Function Attrs: nounwind uwtable
-define signext i8 @f1() #0 {
-  ret i8 102
+define i64 @f1() #0 {
+  %1 = alloca i64, align 8
+  store i64 10000000, i64* %1, align 8
+  %2 = load i64, i64* %1, align 8
+  store volatile i64 0, i64* %1
+  ret i64 %2
 }
 
 ; Function Attrs: nounwind uwtable
-define signext i8 @f2(i8 signext) #0 {
-  %2 = alloca i8, align 1
-  %3 = alloca i8, align 1
-  %4 = alloca i8, align 1
-  store i8 %0, i8* %2, align 1
-  %5 = call signext i8 @f1()
-  %6 = load i8, i8* %2, align 1
-  store volatile i8 0, i8* %2
-  store i8 %6, i8* %4, align 1
-  %7 = load i8, i8* %4, align 1
-  store i8 %7, i8* %3, align 1
-  store volatile i8 0, i8* %3
-  %8 = load i8, i8* %4, align 1
-  store volatile i8 0, i8* %4
-  ret i8 %8
+define i64 @f2(i32) #0 {
+  %2 = alloca i32, align 4
+  store i32 %0, i32* %2, align 4
+  %3 = load i32, i32* %2, align 4
+  store volatile i32 0, i32* %2
+  %4 = sext i32 %3 to i64
+  ret i64 %4
 }
 
 ; Function Attrs: nounwind uwtable
 define i32 @main() #0 {
   %1 = alloca i32, align 4
-  %2 = alloca i8, align 1
+  %2 = alloca i64, align 8
+  %3 = alloca i32, align 4
   store i32 0, i32* %1, align 4
-  store i8 115, i8* %2, align 1
-  %3 = load i8, i8* %2, align 1
-  store volatile i8 0, i8* %2
-  %4 = call signext i8 @f2(i8 signext %3)
+  %4 = call i64 @f1()
+  store i64 %4, i64* %2, align 8
+  store i32 1, i32* %3, align 4
+  %5 = load i32, i32* %3, align 4
+  store volatile i32 0, i32* %3
+  %6 = call i64 @f2(i32 %5)
+  %7 = load i64, i64* %2, align 8
+  store volatile i64 0, i64* %2
+  %8 = sdiv i64 %7, 2
+  store i64 %8, i64* %2, align 8
+  store volatile i64 0, i64* %2
   ret i32 0
 }
 
