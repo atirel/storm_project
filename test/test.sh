@@ -85,7 +85,7 @@ function fatalDisplayer {
 }
 
 function ultimateCleaner {
-   rm -f $1/*.ll $1/*.txt $1/*.bc
+   rm -f $1/*.ll $1/*.bc #$1/.txt
 }
 
 clear
@@ -100,6 +100,9 @@ let "total+=i"
 cd ../c_array_tests
 fatalTestor
 let "total+=i"
+cd ../c_cond_tests
+fatalTestor
+let "total+=i"
 clear
 printf "\n\n\t\t%*s\n\n" $[$COLS/2] "Testing basic C functions without condition or loop or array"
 cd ../basic_c_tests
@@ -107,6 +110,10 @@ fatalDisplayer
 ultimateCleaner .
 cd ../c_array_tests
 printf "\n\n\t\t%*s\n\n" $[COLS/2] " Testing more complex C programs with cond and arrays"
+fatalDisplayer
+ultimateCleaner .
+cd ../c_cond_tests
+printf "\n\n\t\t%*s\n\n" $[COLS/2] " Testing simple and more complex conditions and loops"
 fatalDisplayer
 ultimateCleaner .
 cd ..
