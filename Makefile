@@ -19,6 +19,7 @@ all: $(EXEC)
 
 dumb:	test/dumb.c
 	$(CC) -emit-llvm -c -o dumb.bc $^
+#	$(OPT) -dse < dumb.bc > dumb_temp.bc
 	$(OPT) -load $(PASS_DIR)/$(PASSLIB) $(REQUIREDPASS) $(PASS) < dumb.bc  > ./dumb_path.bc
 	$(LLVMDIS) -o dumb.ll dumb_path.bc
 	$(LLC) dumb_path.bc
