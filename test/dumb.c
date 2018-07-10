@@ -23,11 +23,14 @@ int pointless(void){
 */
 static int ANSWER = 42;
 
+void coucou(int a, ...){
+}
 int main(){
    int a = ANSWER;
 //   int *b = &a;
 //   int *c = b;
    int array[2] = {450};
+   coucou(array[1]);
    printf("%d %d\n", a, array[1]);
    array[0] = 2;
   // pointless();
