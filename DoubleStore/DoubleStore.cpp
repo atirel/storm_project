@@ -100,6 +100,8 @@ namespace {
       return true;
    }
 
+
+
    /**
     * This function is used to display usefull information in order to sum up what have been done by our pass
     * @function doFinalization the last function executed by our pass
@@ -116,6 +118,8 @@ namespace {
       return false;
    }
 
+
+
    /**
     * This function adds a store0 instruction after the instruction storage[i], it needs the operand in order to know where to store the value
     * @param storage, the current vector filled with the instructions already handled
@@ -125,7 +129,6 @@ namespace {
     * @return the new instruction, in order to ve added to the storage vector and for debug purposes
     **/ 
    StoreInst* addStore0(SmallVector<Instruction*, 64> &storage, int i, Value* operand, int place){
-      DebugLoc Dloc = storage[i]->getDebugLoc();
       IRBuilder<> Builder(storage[place]);
       StoreInst* Store0 =  nullptr;
       int ID = 0;
@@ -194,19 +197,22 @@ namespace {
       }
       else{
 	 errs() << "adding STORE 0 (after)\t\t\t";
-	 Dloc.print(errs());
+	 storage[i]->getDebugLoc().print(errs());
 	 errs() << "\n";
       }
       numSTORE0ADDED++;
       return Store0;
    }
-/*
+   /*
    Instruction* getArraySizeStore(SmallVector<Instruction*, 64>& storage, Value operand){
       int count = storage.end() - storage.begin() - 1;
       while(count){
 	 if(storage[count]->getOpcode == 31 && storage[count]->getOperand(1) == operand){
-*/	    
-   /**
+   */
+
+
+
+  /**
     * This function updates the vectore storage, calling if necessary the Store0 function and deleting pointless store instructions
     * @param storage, a vector with all the instructions before the current one in the block
     * @param I, the current instruction
@@ -310,6 +316,36 @@ namespace {
 	 }
       }
    }
+
+
+   void addUniqueUntreated(SmallVector<BasicBlock*, 16> &BBVect, BasicBlock& myBB, SmallVector<BasicBlock*, 16> &BBTreated){
+      int limit = BBVect.end() - BBVect.begin() - 1;
+      while(limit >= 0){
+	 if(BBVect[limit] == &myBB){
+	    return;
+	   }
+	 limit--;
+      }
+      limit = BBTreated.end() - BBTreated.begin() - 1;
+      while(limit >= 0){
+	 if(BBTreated[limit] == &myBB){
+	    return;
+	 }
+	 limit--;
+      }
+      BBVect.push_back(&myBB);
+   }
+
+   void removeAlSeen(SmallVector<BasicBlock*, 16>& BBVect, BasicBlock& BB){
+      int limit = BBVect.end() - BBVect.begin() - 1;
+      while(limit >= 0){
+	 if(BBVect[limit] == &BB){
+	    BBVect.erase(BBVect.begin() + limit);
+	 }
+	 limit--;
+      }
+   }
+
    /**
     * This function adds Store0 instructions at the end of compilation:
     * If a variable is no longer of any use, we put its value to 0
@@ -321,6 +357,68 @@ namespace {
    void addLastStore(SmallVector<Instruction*, 64> &storage, Instruction &I, int k){
       int cpt = storage.end() - storage.begin() - 1;
       Value* operand = I.getOperand(I.getNumOperands() - 1);
+      
+      BasicBlock* BBI = I.getParent();
+      SmallVector<BasicBlock*, 16> alreadySeen;//allows a better tree traversal without infinite loops
+      SmallVector<BasicBlock*, 16> toTreat;//Blocks not treated at the moment
+      alreadySeen.push_back(BBI);
+      toTreat.push_back(BBI);
+      Instruction* blockEnd = BBI->getTerminator();
+      
+      int instIndex = k;
+      bool firstInst = true;
+      while(storage[instIndex] != blockEnd){
+	 if(storage[instIndex]->getNumOperands() != 0 && operand == storage[instIndex]->getOperand(storage[instIndex]->getNumOperands()-1) && &I != storage[instIndex]){
+	    //if the adress where the value is stored/load is the same and the instruction is not itself
+	    return;
+	 }
+	 instIndex++;
+      }
+      while(toTreat.begin() != toTreat.end()){
+      BBI = toTreat[0];
+      while(BBI != nullptr){
+	 if(firstInst){
+	    firstInst = false;
+	 }
+	 else{
+   	    for(Instruction &Ins : *BBI){
+   	       if(Ins.getNumOperands() != 0 && operand == Ins.getOperand(Ins.getNumOperands()-1) && &I != &Ins){
+		  return;
+   	       }
+   	    }
+	 }
+	 if(BranchInst *Binst = dyn_cast<BranchInst>(BBI->getTerminator())){
+	    bool aSeen = false;
+	    int bBlockCpt = 0;
+	    BasicBlock* futureBlock = Binst->getSuccessor(0);
+	    int succToAdd = Binst->getNumSuccessors() - 1;
+	    while(succToAdd >= 0){
+	       addUniqueUntreated(toTreat, *(Binst->getSuccessor(succToAdd)), alreadySeen);
+	       succToAdd--;
+	    } 
+	    while(bBlockCpt < (alreadySeen.end() - alreadySeen.begin() - 1)){
+	       if(alreadySeen[bBlockCpt] == futureBlock){
+		  aSeen = true;
+	       }
+	       bBlockCpt++;
+	    }
+	    if(aSeen){
+	       removeAlSeen(toTreat, *BBI);
+	       BBI = nullptr;
+	    }
+	    else{
+	       removeAlSeen(toTreat, *BBI);
+	       BBI = futureBlock;
+	       alreadySeen.push_back(BBI);		  
+	    }
+	 }
+	 else{
+	    removeAlSeen(toTreat, *BBI);
+	    BBI = nullptr;
+	 }
+      }
+      }
+
       if(Instruction* Inst = dyn_cast<Instruction>(operand)){
 	 if(I.getOpcode() == 31 && Inst->getOpcode() == 32){//if the instruction is a store in a get elementptr addr
 	    while(cpt >= k){//look in all the next instructions
@@ -330,7 +428,7 @@ namespace {
 			   bool allEqual = true;
 			   int numOperands = futureInst->getNumOperands() - 1;
 			   while(numOperands >= 0){
-			      allEqual |= futureInst->getOperand(numOperands) == Inst->getOperand(numOperands);
+			      allEqual &= futureInst->getOperand(numOperands) == Inst->getOperand(numOperands);
 			      numOperands--;
 			   }
 			   if(allEqual){//and the address is the same
@@ -344,13 +442,7 @@ namespace {
 	    }
 	 }
       }
-      cpt = storage.end() - storage.begin() - 1;
-      while(cpt >= k){
-	 if(storage[cpt]->getNumOperands() != 0 && operand == storage[cpt]->getOperand(storage[cpt]->getNumOperands()-1) && &I != storage[cpt]){//if the adress where the value is stored/load is the same and the instruction is not itself
-	    return;
-	 }
-	 cpt--;
-      }
+
       if(Constant *C = dyn_cast<Constant>(I.getOperand(0))){
 	 if(C->isNullValue()){//Checks if the previous instruction was a store 0
 	    return;
@@ -369,8 +461,8 @@ namespace {
 			StoreInst* Store0 = addStore0(storage, k, operand, cpt+1);
 			return;
 		     }
-		  }			
-	       } 
+		  }
+	       }
 	    }
 	 }
 	 cpt--;
