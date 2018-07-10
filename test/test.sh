@@ -3,6 +3,7 @@ place=`pwd`/src-test-files
 COLS=$(tput cols)
 cd $place
 function binGenerator {
+   echo $1
    clang -emit-llvm -c -o $1.bc $1.c
    opt -load ~/storm/llvm-joujou/test/storm_project/build/DoubleStore/LLVMDoubleStore.so -DoubleStore < $1.bc > $2.bc 
    llvm-dis -o $1.ll $2.bc
