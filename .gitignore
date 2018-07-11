@@ -44,6 +44,6 @@
 #other stuff
 build/
 .compiler.sh
-./test/src-test-files/basic_c_tests/*.txt
-./test/src-test-files/c_cond_tests/*.txt
-./test/src-test-files/c_array_tests/*.txt
+test/src-test-files/basic_c_tests/*.txt
+test/src-test-files/c_cond_tests/*.txt
+test/src-test-files/c_array_tests/*.txt
