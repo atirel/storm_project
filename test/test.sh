@@ -8,6 +8,11 @@ function binGenerator {
    opt -load ~/storm/llvm-joujou/test/storm_project/build/DoubleStore/LLVMDoubleStore.so -DoubleStore < $1.bc > $2.bc 
    llvm-dis -o $1.ll $2.bc
    llc $2.bc
+   if [[ ! -e $1.ll ]]
+   then
+      echo "test not found"
+      return
+   fi
    cat $1.ll | grep -v "ModuleID" > $1.txt
 }
 
@@ -16,6 +21,11 @@ function binChecker {
    then
       echo 2
 #      ultimateCleaner `pwd`
+      return
+   fi
+   if [[ ! -e $1.txt ]]
+   then
+      echo 3
       return
    fi
   DIFF=$(diff $1.txt ../../expected-results-tst/$1.txt)
@@ -30,6 +40,7 @@ function binChecker {
 SUC=`echo -e "\033[0;92mSUCCESS\033[0m"`
 FAIL=`echo -e "\033[0;91mFAILURE\033[0m"`
 NOTFOUND=`echo -e "\t\033[1;94m Test Not Found\033[0m"`
+COMPFAIL=`echo -e "\t\033[1;31m      Compilation Failed\033[0m"`
 
 function fatalTestor {
    let "i=1"
@@ -62,9 +73,12 @@ function fatalDisplayer {
 	 elif [[ "$a" == "2" ]]
 	 then
 	    printf "%*s" $[$COLS/2-sizename] "$NOTFOUND"
-	 else
+	 elif [[ "$a" == "1" ]]
+	 then
    	    printf "%*s" $[$COLS/2-sizename] "$FAIL"
-   	 fi
+   	 else
+	    printf "%*s" $[$COLS/2-sizename] "$COMPFAIL"
+	 fi
    	 let "i+=1"
       fi
    done
@@ -83,6 +97,7 @@ function fatalDisplayer {
    fi
    echo -e "$(( successRate / 100)).$(( successRate % 100))%\n\n\n\033[0m"
    rm -f *.bc my_bc *.ll *.s
+   echo $j > value.txt
 }
 
 function ultimateCleaner {
@@ -95,15 +110,28 @@ echo "for convention, everything will be erased before showing test results"
 printf "\n\n\n\n\n%*s\n\n\n\n\n" $[$COLS/2] "press a key to continue"
 read continuation
 let total=0
+let success=0
 cd basic_c_tests
 fatalTestor
-let "total+=i"
+wd=`pwd`
+a=`cat $wd/value.txt`
+let "success+=a"
+nfiles=`ls | grep -c -o "\.c"`
+let "total+=nfiles"
 cd ../c_array_tests
 fatalTestor
-let "total+=i"
+wd=`pwd`
+a=`cat $wd/value.txt`
+let "success+=a"
+nfiles=`ls | grep -c -o "\.c"`
+let "total+=nfiles"
 cd ../c_cond_tests
 fatalTestor
-let "total+=i"
+wd=`pwd`
+a=`cat $wd/value.txt`
+let "success+=a"
+nfiles=`ls | grep -c -o "\.c"`
+let "total+=nfiles"
 clear
 printf "\n\n\t\t%*s\n\n" $[$COLS/2] "Testing basic C functions without condition or loop or array"
 cd ../basic_c_tests
@@ -117,4 +145,7 @@ cd ../c_cond_tests
 printf "\n\n\t\t%*s\n\n" $[COLS/2] " Testing simple and more complex conditions and loops"
 fatalDisplayer
 ultimateCleaner .
+echo -e "total test: $total\ntotal success: $success"
+percent=$(( success * 100 / total ))
+echo -e "Total success rate: $percent.$(( success * 10000 % total ))%"
 cd ..
