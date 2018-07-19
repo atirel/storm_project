@@ -27,6 +27,11 @@ dumb:	test/dumb.c
 
 test: exec_test
 
+init:	test/dumb.c
+	$(CC) -emit-llvm -c -o dumb_temp.bc $^
+	$(OPT) -load build/Initialize/LLVMInitialize.so -Initialize < dumb_temp.bc > dumb.bc
+	$(LLVMDIS) -o dumb.ll dumb.bc
+
 exec_test:
 	cd test && ./test.sh
 
