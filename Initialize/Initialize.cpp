@@ -1,7 +1,5 @@
 /**
- * This LLVM pass deletes useless stores e.g store which are followed by another store
- * It also adds a STORE 0 %add after a load followed by a store in order to check with their values wether or not 2 variables are semantically equivalent
- * It should be used after the dse pass since it reduces significally the number of instructions to handle.
+ * This LLVM pass adds a store 0 after every single alloca to ensure that the variable is initialized
  * @author INRIA Bordeaux STORM Project Team
  **/
 

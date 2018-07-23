@@ -18,5 +18,6 @@ include(AddLLVM)
 
 link_directories(${LLVM_LIBRARY_DIRS})
 
-add_subdirectory(DoubleStore)
+#add_subdirectory(DoubleStore)
+add_subdirectory(DeadVariableHandler)
 add_subdirectory(Initialize)

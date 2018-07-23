@@ -5,7 +5,8 @@ cd $place
 function binGenerator {
    echo $1
    clang -emit-llvm -c -o $1.bc $1.c
-   opt -load ~/storm/llvm-joujou/test/storm_project/build/DoubleStore/LLVMDoubleStore.so -DoubleStore < $1.bc > $2.bc 
+   opt -dse < $1.bc > temp.bc
+   opt -load ~/storm/llvm-joujou/test/storm_project/build/DeadVariableHandler/LLVMDeadVariableHandler.so -DVH < temp.bc > $2.bc 
    llvm-dis -o $1.ll $2.bc
    llc $2.bc
    if [[ ! -e $1.ll ]]
@@ -107,8 +108,8 @@ function ultimateCleaner {
 clear
 echo "Do not worry if you see useless stuff for testing purposes, the execution is written over cerrs and as far as my knowledge goes, i don't know a way to hide it while saving it"
 echo "for convention, everything will be erased before showing test results"
-printf "\n\n\n\n\n%*s\n\n\n\n\n" $[$COLS/2] "press a key to continue"
-read continuation
+printf "\n\n\n\n\n%*s\n\n\n\n\n" $[$COLS/2] "press I for Initialization tests and D for DeadVariables tests"
+read $continuation
 let total=0
 let success=0
 cd basic_c_tests
