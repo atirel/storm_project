@@ -35,28 +35,33 @@ define i64 @f6() #0 {
 ; Function Attrs: nounwind uwtable
 define i32 @main() #0 {
   %1 = alloca i32, align 4
+  store volatile i32 0, i32* %1
   %2 = alloca i64, align 8
+  store volatile i64 0, i64* %2
   %3 = alloca i32, align 4
+  store volatile i32 0, i32* %3
   %4 = alloca i64, align 8
+  store volatile i64 0, i64* %4
   store i32 0, i32* %1, align 4
   %5 = call i64 @f1()
+  store i64 %5, i64* %2, align 8
   %6 = call i64 @f2()
+  store i64 %6, i64* %2, align 8
   %7 = call signext i16 @f3()
   %8 = sext i16 %7 to i64
+  store i64 %8, i64* %2, align 8
   %9 = call zeroext i16 @f4()
   %10 = zext i16 %9 to i64
   store i64 %10, i64* %2, align 8
-  store volatile i64 0, i64* %2
   %11 = call i32 @f5()
   store i32 %11, i32* %3, align 4
   %12 = call i64 @f6()
   %13 = load i32, i32* %3, align 4
-  store volatile i32 0, i32* %3
   %14 = zext i32 %13 to i64
   %15 = add nsw i64 %12, %14
+  store i64 %15, i64* %4, align 8
   %16 = call i64 @f1()
   store i64 %16, i64* %4, align 8
-  store volatile i64 0, i64* %4
   ret i32 0
 }
 

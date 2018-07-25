@@ -5,8 +5,15 @@ cd $place
 function binGenerator {
    echo $1
    clang -emit-llvm -c -o $1.bc $1.c
-   opt -dse < $1.bc > temp.bc
-   opt -load ~/storm/llvm-joujou/test/storm_project/build/DeadVariableHandler/LLVMDeadVariableHandler.so -DVH < temp.bc > $2.bc 
+   if [[ "$3" == "I" ]]
+   then
+      opt -load ~/storm/llvm-joujou/test/storm_project/build/Initialize/LLVMInitialize.so -Initialize < $1.bc > $2.bc
+   fi
+   if [[ "$3" == "D" ]]
+   then
+      opt -dse < $1.bc > temp.bc
+      opt -load ~/storm/llvm-joujou/test/storm_project/build/DeadVariableHandler/LLVMDeadVariableHandler.so -DVH < temp.bc > $2.bc
+   fi
    llvm-dis -o $1.ll $2.bc
    llc $2.bc
    if [[ ! -e $1.ll ]]
@@ -18,7 +25,15 @@ function binGenerator {
 }
 
 function binChecker {
-   if [[ ! -e ../../expected-results-tst/$1.txt ]]
+   if [[ "$2" == "I" ]]
+   then
+      dir=Initialization_tests
+   fi
+   if [[ "$2" == "D" ]]
+   then
+      dir=DeadVariable_tests
+   fi
+   if [[ ! -e ../../expected-results-tst/$dir/$1.txt ]]
    then
       echo 2
 #      ultimateCleaner `pwd`
@@ -29,7 +44,7 @@ function binChecker {
       echo 3
       return
    fi
-  DIFF=$(diff $1.txt ../../expected-results-tst/$1.txt)
+  DIFF=$(diff $1.txt ../../expected-results-tst/$dir/$1.txt)
    if [[ $DIFF != "" ]]
    then
       echo 1
@@ -50,7 +65,7 @@ function fatalTestor {
       if [ ${file: -2} == ".c" ]
       then
 	 my_file=`echo "$file" | cut -d\. -f1`
-	 binGenerator $my_file $i 
+	 binGenerator $my_file $i $1
       fi
       let "i+=1"
    done
@@ -66,7 +81,7 @@ function fatalDisplayer {
    	 echo -n -e "\n$file"
    	 my_file=`echo "$file" | cut -d\. -f1` 
    	 sizename=${#file}
-   	 a=`binChecker $my_file`
+   	 a=`binChecker $my_file $1`
    	 if [[ "$a" == "0" ]]
    	 then
    	    printf "%*s" $[$COLS/2-sizename] "$SUC"
@@ -109,25 +124,31 @@ clear
 echo "Do not worry if you see useless stuff for testing purposes, the execution is written over cerrs and as far as my knowledge goes, i don't know a way to hide it while saving it"
 echo "for convention, everything will be erased before showing test results"
 printf "\n\n\n\n\n%*s\n\n\n\n\n" $[$COLS/2] "press I for Initialization tests and D for DeadVariables tests"
-read $continuation
+read continuation
+while [[ "$continuation" != "I" && "$continuation" != "D" ]]
+do
+   echo "please press I for Initialization or D for DeadVariables tests"
+   read continuation
+done
+
 let total=0
 let success=0
 cd basic_c_tests
-fatalTestor
+fatalTestor $continuation
 wd=`pwd`
 a=`cat $wd/value.txt`
 let "success+=a"
 nfiles=`ls | grep -c -o "\.c"`
 let "total+=nfiles"
 cd ../c_array_tests
-fatalTestor
+fatalTestor $continuation
 wd=`pwd`
 a=`cat $wd/value.txt`
 let "success+=a"
 nfiles=`ls | grep -c -o "\.c"`
 let "total+=nfiles"
 cd ../c_cond_tests
-fatalTestor
+fatalTestor $continuation
 wd=`pwd`
 a=`cat $wd/value.txt`
 let "success+=a"
@@ -136,15 +157,15 @@ let "total+=nfiles"
 clear
 printf "\n\n\t\t%*s\n\n" $[$COLS/2] "Testing basic C functions without condition or loop or array"
 cd ../basic_c_tests
-fatalDisplayer
+fatalDisplayer $continuation
 ultimateCleaner .
 cd ../c_array_tests
 printf "\n\n\t\t%*s\n\n" $[COLS/2] " Testing more complex C programs with cond and arrays"
-fatalDisplayer
+fatalDisplayer $continuation
 ultimateCleaner .
 cd ../c_cond_tests
 printf "\n\n\t\t%*s\n\n" $[COLS/2] " Testing simple and more complex conditions and loops"
-fatalDisplayer
+fatalDisplayer $continuation
 ultimateCleaner .
 echo -e "total test: $total\ntotal success: $success"
 percent=$(( success * 100 / total ))

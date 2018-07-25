@@ -7,17 +7,17 @@ target triple = "x86_64-unknown-linux-gnu"
 ; Function Attrs: nounwind uwtable
 define void @displayer(i32, i32, i32) #0 {
   %4 = alloca i32, align 4
+  store volatile i32 0, i32* %4
   %5 = alloca i32, align 4
+  store volatile i32 0, i32* %5
   %6 = alloca i32, align 4
+  store volatile i32 0, i32* %6
   store i32 %0, i32* %4, align 4
   store i32 %1, i32* %5, align 4
   store i32 %2, i32* %6, align 4
   %7 = load i32, i32* %4, align 4
-  store volatile i32 0, i32* %4
   %8 = load i32, i32* %5, align 4
-  store volatile i32 0, i32* %5
   %9 = load i32, i32* %6, align 4
-  store volatile i32 0, i32* %6
   %10 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([57 x i8], [57 x i8]* @.str, i32 0, i32 0), i32 %7, i32 %8, i32 %9)
   ret void
 }
@@ -27,9 +27,13 @@ declare i32 @printf(i8*, ...) #1
 ; Function Attrs: nounwind uwtable
 define i32 @main() #0 {
   %1 = alloca i32, align 4
+  store volatile i32 0, i32* %1
   %2 = alloca i32, align 4
+  store volatile i32 0, i32* %2
   %3 = alloca i32, align 4
+  store volatile i32 0, i32* %3
   %4 = alloca i32, align 4
+  store volatile i32 0, i32* %4
   store i32 0, i32* %1, align 4
   %5 = call i64 @time(i64* null) #3
   %6 = trunc i64 %5 to i32
@@ -53,11 +57,8 @@ define i32 @main() #0 {
 
 ; <label>:17:                                     ; preds = %13
   %18 = load i32, i32* %4, align 4
-  store volatile i32 0, i32* %4
   %19 = load i32, i32* %2, align 4
-  store volatile i32 0, i32* %2
   %20 = load i32, i32* %3, align 4
-  store volatile i32 0, i32* %3
   call void @displayer(i32 %18, i32 %19, i32 %20)
   br label %34
 
@@ -69,21 +70,15 @@ define i32 @main() #0 {
 
 ; <label>:25:                                     ; preds = %21
   %26 = load i32, i32* %2, align 4
-  store volatile i32 0, i32* %2
   %27 = load i32, i32* %4, align 4
-  store volatile i32 0, i32* %4
   %28 = load i32, i32* %3, align 4
-  store volatile i32 0, i32* %3
   call void @displayer(i32 %26, i32 %27, i32 %28)
   br label %33
 
 ; <label>:29:                                     ; preds = %21
   %30 = load i32, i32* %2, align 4
-  store volatile i32 0, i32* %2
   %31 = load i32, i32* %3, align 4
-  store volatile i32 0, i32* %3
   %32 = load i32, i32* %4, align 4
-  store volatile i32 0, i32* %4
   call void @displayer(i32 %30, i32 %31, i32 %32)
   br label %33
 
@@ -101,11 +96,8 @@ define i32 @main() #0 {
 
 ; <label>:39:                                     ; preds = %35
   %40 = load i32, i32* %4, align 4
-  store volatile i32 0, i32* %4
   %41 = load i32, i32* %3, align 4
-  store volatile i32 0, i32* %3
   %42 = load i32, i32* %2, align 4
-  store volatile i32 0, i32* %2
   call void @displayer(i32 %40, i32 %41, i32 %42)
   br label %56
 
@@ -117,21 +109,15 @@ define i32 @main() #0 {
 
 ; <label>:47:                                     ; preds = %43
   %48 = load i32, i32* %3, align 4
-  store volatile i32 0, i32* %3
   %49 = load i32, i32* %2, align 4
-  store volatile i32 0, i32* %2
   %50 = load i32, i32* %4, align 4
-  store volatile i32 0, i32* %4
   call void @displayer(i32 %48, i32 %49, i32 %50)
   br label %55
 
 ; <label>:51:                                     ; preds = %43
   %52 = load i32, i32* %3, align 4
-  store volatile i32 0, i32* %3
   %53 = load i32, i32* %4, align 4
-  store volatile i32 0, i32* %4
   %54 = load i32, i32* %2, align 4
-  store volatile i32 0, i32* %2
   call void @displayer(i32 %52, i32 %53, i32 %54)
   br label %55
 
