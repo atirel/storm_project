@@ -28,9 +28,9 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instruction.h"
+#include "llvm/Analysis/LoopInfoImpl.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Analysis/LoopInfo.h"
-
 
 using namespace llvm;
 
@@ -43,9 +43,14 @@ namespace {
    DeadVariableHandler() : FunctionPass(ID) {}
    bool runOnFunction(Function &F) override {
       SmallVector <Instruction*,16> storage;
+      SmallVector <BasicBlock*, 8> blocksInLoop;
+      LoopInfo& loopData = getAnalysis<LoopInfoWrapperPass>().getLoopInfo();
+      for(BasicBlock &BB : F){
+	 if(loopData.isLoopHeader(&BB)){
+	    blocksInLoop.push_back(&BB);
+	 }
+      }
       int storageSize = 0;
-      bool store0Usefull = false;//is the variable dead?
-      bool isSmtgHap = true;//is the value loaded after the current instruction
       bool isFirstBlock = false;//is the current basic block the first one?
       Instruction* I = F.back().getTerminator();//I is the last instruction of the function
       Function::iterator itBlock = --F.end();
@@ -54,84 +59,118 @@ namespace {
    	 I = BB->getTerminator();
    	 while(I != nullptr){
    	    if(I->getOpcode() == 30 || I->getOpcode() == 31){
-   	       storage.push_back(I);
-   	       storageSize++; 
+      	       if(GlobalVariable *GV = dyn_cast<GlobalVariable>(I->getOperand(I->getNumOperands() - 1))){
+	       }
+	       else{
+   		  storage.push_back(I);
+   		  storageSize++;
+	       }
    	    }
    	    I = I->getPrevNode();	 //'new' I is now the instruction right before 'old' I.
 	 }
        	 if(itBlock == F.begin()){
-    	    isFirstBlock = true;
+    	    isFirstBlock = true;//since we move from the last to the first, we need to know when we reach the beginning
     	 } 
 	 else{
-	    itBlock--;
+	    itBlock--;//goes to the previous block
 	 }
       }
       int cpt = 0;
-      while(cpt <= storageSize - 1){
+      while(cpt <= storageSize - 1){//Look in all the instruction
 	 int cpt_bis = 0;
-	 while(cpt_bis < cpt){
+	 bool isEverUsedAfter = false;//is the variable used, at least once after this instruction
+	 bool loadedInHeader = false;//is the variable loaded in a loop header
+	 if(isLoadedInHeader(blocksInLoop, storage[cpt])){//if the variable is loaded in a header, we cannot put its value to 0 due to the return to the conditional point
+	    loadedInHeader = true;
+	    isEverUsedAfter = true;//hence, we can say that the variable might be reused if the loop condition is true which can't be determined at compile time
+	 }
+	 while(cpt_bis < cpt){ 
 	    if(storage[cpt_bis]->getOperand(storage[cpt_bis]->getNumOperands() - 1) == storage[cpt]->getOperand(storage[cpt]->getNumOperands() - 1)){
+	       isEverUsedAfter = true;
 	       if(storage[cpt_bis]->getOpcode() == 31 && storage[cpt_bis]->getParent() == storage[cpt]->getParent() && !isAStore0Inst(*storage[cpt])){
 		  addStore0(*storage[cpt]);
+		  break;
+	       }
+	       if(storage[cpt_bis]->getOpcode() == 31 && !loadedInHeader){
+		  isEverUsedAfter = false;
+	       }
+	       if(storage[cpt_bis]->getOpcode() == 30){
 		  break;
 	       }
 	    }
 	    cpt_bis++;
 	 }
+	 if(!isEverUsedAfter && !isAtZeroInTheBlock(*storage[cpt]->getParent(), storage[cpt]->getOperand(storage[cpt]->getNumOperands() - 1))){
+	    addStore0(*storage[cpt]);
+	 }
 	 if(!isAtZeroInTheBlock(F.back(), storage[cpt]->getOperand(storage[cpt]->getNumOperands() - 1))){
-   	    addStore0(*storage[cpt], storage[cpt]->getOperand(storage[cpt]->getNumOperands() - 1), storage[0]->getParent()->getTerminator());
+   	    addStore0(*storage[cpt], storage[cpt]->getOperand(storage[cpt]->getNumOperands() - 1), F.back().getTerminator());
 	 }
 	 
 	 cpt++;
       }
- }
+   }
 
- bool isAStore0Inst(Instruction &I){
-    if(I.getOpcode() == 31){
-       if(Constant *C = dyn_cast<Constant>(I.getOperand(0))){
-	  if(C->isNullValue()){
-	     return true;
-	  }
-       }
-    }
- }
+   virtual void getAnalysisUsage(AnalysisUsage& AU) const override {
+      AU.addRequired<LoopInfoWrapperPass>();
+   }
+  
+   bool isAStore0Inst(Instruction &I){
+      if(I.getOpcode() == 31){
+    	 if(Constant *C = dyn_cast<Constant>(I.getOperand(0))){
+  	    if(C->isNullValue()){
+  	       return true;
+  	    }
+  	 }
+      }
+   }
 
- bool isAtZeroInTheBlock(BasicBlock &BB, Value* V){
-    Instruction* I = BB.getTerminator();
-    while(I != nullptr){
-       if(I->getNumOperands() != 0 && I->getOperand(I->getNumOperands() - 1) == V){
-	  if(isAStore0Inst(*I)){
-	     return true;
-	  }
-	  return false;
-       }
-    I = I->getPrevNode();
-    }
-    return false;
- }
- bool isInSuccessor(BasicBlock* BBTest, BasicBlock* BBSample, bool res=false){
-    if(BranchInst *BINP = dyn_cast<BranchInst>(BBSample->getTerminator())){
-       int numSuccessor = BINP->getNumSuccessors();
-       if(numSuccessor == 0){
-   	  return false;
-       }
-       while(numSuccessor){
-	  res |= ((BINP->getSuccessor(numSuccessor-1) == BBTest) || isInSuccessor(BINP->getSuccessor(numSuccessor - 1), BBSample));
-	  numSuccessor--;
-       }
-       return res;
-    }
-    else{
-       return BBSample == BBTest;
-    }
- }
+   bool isInSmallBasicBlockVect(SmallVector<BasicBlock*, 8> &SVBB, BasicBlock &BB){
+      int size = SVBB.end() - SVBB.begin() - 1;
+      while(size >= 0){
+	 if(SVBB[size] == &BB){
+	    return true;
+	 }
+	 size--;
+      }
+      return false;
+   }
 
+   bool isAtZeroInTheBlock(BasicBlock &BB, Value* V){
+      Instruction* I = BB.getTerminator();
+      while(I != nullptr){
+  	 if(I->getNumOperands() != 0 && I->getOperand(I->getNumOperands() - 1) == V){
+  	    if(isAStore0Inst(*I)){
+  	       return true;
+  	    }
+  	    return false;
+    	 }
+     	 I = I->getPrevNode();
+      }
+      return false;
+   }
 
- void addStore0(Instruction &I, Value* V = nullptr, Instruction *Iplace = nullptr){
+   bool isLoadedInHeader(SmallVector<BasicBlock*,8> HeaderBBlocks, Instruction *Ins){
+      BasicBlock *BB = Ins->getParent();
+      while(BB != nullptr){
+	 if(isInSmallBasicBlockVect(HeaderBBlocks, *BB)){
+	    for(Instruction &I : *BB){
+	       if(I.getOpcode() == 30 && I.getOperand(0) == Ins->getOperand(Ins->getNumOperands() - 1)){
+		  return true;
+	       }
+	    }
+	 }
+	 BB = BB->getPrevNode();
+      }
+      return false;
+   }
+
+   void addStore0(Instruction &I, Value* V = nullptr, Instruction *Iplace = nullptr){
+      errs() << I << "\n";
       Instruction *NextI = Iplace;
-     if(NextI == nullptr){
- 	NextI = I.getNextNode();
-     }
+      if(NextI == nullptr){
+	 NextI = I.getNextNode();
+      }
       if(V == nullptr){
    	 V = I.getOperand(I.getNumOperands() - 1);
       }
@@ -191,11 +230,13 @@ namespace {
 	    break;
 
 	 case Type::VectorTyID:
-	    //Store0 = Builder.CreateStore(ConstantDataVector::get(Type::getVectorTy(Builder.getContext()), 0), I, true);
+	    //VectorType* vect = dyn_cast<VectorType>(I.getType());
+	    //Store0 = Builder.CreateStore(Constant::getNullValue(vect), V, true);
 	    break;
+
 	 case Type::ArrayTyID:
 	    ArrayType* array = dyn_cast<ArrayType>(I.getType());
-	    Builder.CreateStore(Constant::getNullValue(array), V, true);
+	    Store0 = Builder.CreateStore(Constant::getNullValue(array), V, true);
 	    break;
       }
       if(Store0 == nullptr){
@@ -203,7 +244,7 @@ namespace {
       }
       else{
 	 errs() << "adding STORE 0 (after)\t\t\t";
-//	 I.getDebugLoc().print(errs());
+	 I.getDebugLoc().print(errs());
 	 errs() << "\n";
       }
       numSTORE0ADDED++;
@@ -215,27 +256,3 @@ namespace {
 char DeadVariableHandler::ID = 0;
 int DeadVariableHandler::numSTORE0ADDED = 0;
 static RegisterPass<DeadVariableHandler> X("DVH", "DeadVariableHandler Pass");
-/*
-      SmallVector<Instruction*, 16> store;
-      for(BasicBlock &BB : F){
-	 for(Instruction &I : BB){
-	    if(I.getOpcode() == 31 || I.getOpcode() == 30){
-	       store.push_back(&I);
-	    }
-	 }
-      }
-      int size = store.end() - store.begin() - 1;
-      int cpt1 = size;
-      bool store0Usefull = true;
-      while(cpt1 > 0){
-	 Instruction* currentInstruction = store[cpt1];
-	 int cpt2 = cpt1;
-
-	 while(cpt2 < size){
-	    cpt2++;
-	 }
-   	 if(store0Usefull){
-   	    addStore0(store[cpt1]);
-      	 }
-	 cpt1--;*/
-
