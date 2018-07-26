@@ -31,7 +31,7 @@ function binChecker {
    fi
    if [[ "$2" == "D" ]]
    then
-      dir=DeadVariable_tests
+      dir=DeadVariables_tests
    fi
    if [[ ! -e ../../expected-results-tst/$dir/$1.txt ]]
    then
@@ -99,7 +99,7 @@ function fatalDisplayer {
       fi
    done
    let "i-=1"
-   echo -e "\n\n\n"
+   echo -e "\n"
    printf "%*s" $[$COLS/2-10] "Success rate: "
    successRate=$(( j * 10000 / i))
    if [[ "$successRate" -ge "7500" ]]
@@ -155,16 +155,16 @@ let "success+=a"
 nfiles=`ls | grep -c -o "\.c"`
 let "total+=nfiles"
 clear
-printf "\n\n\t\t%*s\n\n" $[$COLS/2] "Testing basic C functions without condition or loop or array"
+printf "\t\t%*s\n\n" $[$COLS/2] "Testing basic C functions without condition or loop or array"
 cd ../basic_c_tests
 fatalDisplayer $continuation
 ultimateCleaner .
 cd ../c_array_tests
-printf "\n\n\t\t%*s\n\n" $[COLS/2] " Testing more complex C programs with cond and arrays"
+printf "\n\t\t%*s\n\n" $[COLS/2] " Testing more complex C programs with cond and arrays"
 fatalDisplayer $continuation
 ultimateCleaner .
 cd ../c_cond_tests
-printf "\n\n\t\t%*s\n\n" $[COLS/2] " Testing simple and more complex conditions and loops"
+printf "\n\t\t%*s\n\n" $[COLS/2] " Testing simple and more complex conditions and loops"
 fatalDisplayer $continuation
 ultimateCleaner .
 echo -e "total test: $total\ntotal success: $success"
