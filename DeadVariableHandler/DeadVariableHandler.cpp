@@ -1,6 +1,5 @@
 /**
- * This LLVM pass deletes useless stores e.g store which are followed by another store
- * It also adds a STORE 0 %add after a load followed by a store in order to check with their values wether or not 2 variables are semantically equivalent
+ * This LLVM pass adds a STORE 0 %add after a load followed by a store in order to check with their values wether or not 2 variables are semantically equivalent
  * It should be used after the dse pass since it reduces significally the number of instructions to handle.
  * @author INRIA Bordeaux STORM Project Team
  **/
@@ -59,9 +58,7 @@ namespace {
    	 I = BB->getTerminator();
    	 while(I != nullptr){
    	    if(I->getOpcode() == 30 || I->getOpcode() == 31){
-      	       if(GlobalVariable *GV = dyn_cast<GlobalVariable>(I->getOperand(I->getNumOperands() - 1))){
-	       }
-	       else{
+      	       if(AllocaInst *AI = dyn_cast<AllocaInst>(I->getOperand(I->getNumOperands() - 1))){
    		  storage.push_back(I);
    		  storageSize++;
 	       }
@@ -166,7 +163,6 @@ namespace {
    }
 
    void addStore0(Instruction &I, Value* V = nullptr, Instruction *Iplace = nullptr){
-      errs() << I << "\n";
       Instruction *NextI = Iplace;
       if(NextI == nullptr){
 	 NextI = I.getNextNode();
@@ -243,9 +239,11 @@ namespace {
 	 errs() << "can't do my stuff\n";
       }
       else{
-	 errs() << "adding STORE 0 (after)\t\t\t";
-	 I.getDebugLoc().print(errs());
-	 errs() << "\n";
+	 if(I.getDebugLoc()){
+	    errs() << "adding STORE 0 (after)\t\t\t";
+	    I.getDebugLoc().print(errs());
+	    errs() << "\n";
+	 }
       }
       numSTORE0ADDED++;
    }
