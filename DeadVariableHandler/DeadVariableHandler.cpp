@@ -1,5 +1,5 @@
 /**
- * This LLVM pass adds a STORE 0 %add after a load followed by a store in order to check with their values wether or not 2 variables are semantically equivalent
+ * This LLVM pass adds a STORE 0 %address after a load followed by a store in order to check with their values wether or not 2 variables are semantically equivalent
  * It should be used after the dse pass since it reduces significally the number of instructions to handle.
  * @author INRIA Bordeaux STORM Project Team
  **/
@@ -81,37 +81,51 @@ namespace {
 	    loadedInHeader = true;
 	    isEverUsedAfter = true;//hence, we can say that the variable might be reused if the loop condition is true which can't be determined at compile time
 	 }
-	 while(cpt_bis < cpt){ 
+	 while(cpt_bis < cpt){//for all the store/load instruction after the current one 
 	    if(storage[cpt_bis]->getOperand(storage[cpt_bis]->getNumOperands() - 1) == storage[cpt]->getOperand(storage[cpt]->getNumOperands() - 1)){
-	       isEverUsedAfter = true;
+	       //if the register is the same
+	       isEverUsedAfter = true;//the variable is reused
 	       if(storage[cpt_bis]->getOpcode() == 31 && storage[cpt_bis]->getParent() == storage[cpt]->getParent() && !isAStore0Inst(*storage[cpt])){
+		  //if the value is overwritten, we can put it to 0 just after the first write
+		  //technically, dse asserts that we cannot enter into this state
 		  addStore0(*storage[cpt]);
 		  break;
 	       }
 	       if(storage[cpt_bis]->getOpcode() == 31 && !loadedInHeader){
-		  isEverUsedAfter = false;
+		  isEverUsedAfter = false;//if the value is rewritten in another block then we can suppose that it will never be used
 	       }
-	       if(storage[cpt_bis]->getOpcode() == 30){
-		  break;
+	       if(storage[cpt_bis]->getOpcode() == 30){//if the value is loaded
+		  SmallVector<BasicBlock*, 8> futureStack;
+		  if(isInSuccessor(*storage[cpt]->getParent(), *storage[cpt_bis]->getParent(), futureStack)){//in a block accessible from the current one
+		     break;//we shall not pass !
+		  }
+		  isEverUsedAfter = false;//elsewhere the value in itself is not reused since the block where it will be loaded is not reachable from the block we are currently visiting
 	       }
 	    }
 	    cpt_bis++;
 	 }
-	 if(!isEverUsedAfter && !isAtZeroInTheBlock(*storage[cpt]->getParent(), storage[cpt]->getOperand(storage[cpt]->getNumOperands() - 1))){
+	 if(!isEverUsedAfter && !isAtZeroInTheBlock(*storage[cpt]->getParent(), storage[cpt]->getOperand(storage[cpt]->getNumOperands() - 1))){//if the variable is not used anymore and is not already at 0
 	    addStore0(*storage[cpt]);
 	 }
-	 if(!isAtZeroInTheBlock(F.back(), storage[cpt]->getOperand(storage[cpt]->getNumOperands() - 1))){
+	 if(!isAtZeroInTheBlock(F.back(), storage[cpt]->getOperand(storage[cpt]->getNumOperands() - 1))){//whatever the case is, we put the value at 0 at the end of the program to make sure that it is really erased once and for all
    	    addStore0(*storage[cpt], storage[cpt]->getOperand(storage[cpt]->getNumOperands() - 1), F.back().getTerminator());
 	 }
-	 
 	 cpt++;
       }
+      return true;
    }
 
    virtual void getAnalysisUsage(AnalysisUsage& AU) const override {
       AU.addRequired<LoopInfoWrapperPass>();
    }
   
+
+   /**
+    * @function isAStore0Inst:
+    * tests if an Instruction is a Store 0 one
+    * @param I the instruction to be tested
+    * @returns true if the instruction was a Store 0, false elsewhere
+    **/
    bool isAStore0Inst(Instruction &I){
       if(I.getOpcode() == 31){
     	 if(Constant *C = dyn_cast<Constant>(I.getOperand(0))){
@@ -120,8 +134,16 @@ namespace {
   	    }
   	 }
       }
+      return false;
    }
 
+   /**
+    * @function isInSmallBasicBlockVect:
+    * tests if the basicBlock in parameter is in the SmallVector in param
+    * @param SVBB the SmallVector containing some BasicBlocks
+    * @param BB a BasicBlock
+    * @returns true if BB is in SVBB, false elsewhere
+    **/
    bool isInSmallBasicBlockVect(SmallVector<BasicBlock*, 8> &SVBB, BasicBlock &BB){
       int size = SVBB.end() - SVBB.begin() - 1;
       while(size >= 0){
@@ -133,6 +155,14 @@ namespace {
       return false;
    }
 
+   /**
+    * @function isAtZeroInTheBlock:
+    * checks if the Value V is put at 0 at the end of the block, if there is any other instruction touching to V, it supposes that it does not store a 0
+    * @param BB the BasicBlock where our test is run
+    * @param V the Value supposed to be put at 0
+    * @precond V is matching a register, if this precond is false, the function will always return false
+    * @returns true if the last instruction on V in BB is a Store 0 => if V is put at 0 at the end of the block
+    **/
    bool isAtZeroInTheBlock(BasicBlock &BB, Value* V){
       Instruction* I = BB.getTerminator();
       while(I != nullptr){
@@ -147,6 +177,15 @@ namespace {
       return false;
    }
 
+   /**
+    * @function isLoadedInHeader:
+    * checks if the value loaded/stored in the Instruction is ever loaded in a loop Header
+    * @precond HeaderBBlocks contains only loop headers
+    * @precond Ins is either a store or a load instruction
+    * @param HeaderBBblocks a SmallVector containing all the headers of all the loops in the function
+    * @param Ins, the instruction accessing the value
+    * @returns true, if the variable accessed by Ins is loaded in any header, false elsewhere
+    **/
    bool isLoadedInHeader(SmallVector<BasicBlock*,8> HeaderBBlocks, Instruction *Ins){
       BasicBlock *BB = Ins->getParent();
       while(BB != nullptr){
@@ -162,6 +201,44 @@ namespace {
       return false;
    }
 
+   /**
+    * @function isInSuccessor:
+    * checks if a BasicBlock can be reached from another, if he is its successor, or a successor of its successors...
+    * @param BBPrec, the supposed predecessor
+    * @param BBSucc, the successor
+    * @param SVBB, a SmallVector with all the BasicBlocks already visited
+    * @param reval, the default return value
+    * @returns true, if their is a way from BBPrec to BBSucc (or even if it's the same block), false elsewhere
+    **/
+   bool isInSuccessor(BasicBlock &BBPrec, BasicBlock &BBSucc, SmallVector<BasicBlock*, 8> &SVBB, bool retval = false){
+      if(&BBPrec == &BBSucc){
+	 return true;
+      }
+      if(BranchInst * BINP = dyn_cast<BranchInst>(BBPrec.getTerminator())){
+	 int nSucc = BINP->getNumSuccessors();
+	 while(nSucc){
+	    if(!isInSmallBasicBlockVect(SVBB, *BINP->getSuccessor(nSucc - 1))){
+	       SVBB.push_back(BINP->getSuccessor(nSucc - 1));
+	       retval = retval || isInSuccessor(*BINP->getSuccessor(nSucc - 1), BBSucc, SVBB);
+	    }
+	    nSucc--;
+	 }
+      }
+      else{
+	 return retval;
+      }
+   }
+
+
+   /**@function addStore0
+    * adds a store 0 of the Value V, before the instruction Iplace.
+    * in debug mode, it tries to display where in the source code it decided to add this store 0 instruction.
+    * @param I, the instruction with all the data we need
+    * @param V, the Value containing the type of store 0 we want (default, the value accessed by I)
+    * @param Iplace, the instruction before which we want to add a store 0 instruction (default, before the instruction following I)
+    * @returns nothing but
+    * @postcond a Store 0 instruction was added before Iplace or right after I
+    **/
    void addStore0(Instruction &I, Value* V = nullptr, Instruction *Iplace = nullptr){
       Instruction *NextI = Iplace;
       if(NextI == nullptr){
@@ -247,6 +324,22 @@ namespace {
       }
       numSTORE0ADDED++;
    }
+
+   /**
+    * This function is used to display usefull information in order to sum up what have been done by our pass
+    * @function doFinalization the last function executed by our pass
+    * @param the current module
+    * @returns false because the code wasn't modified during its execution
+    **/
+   bool doFinalization(Module &M) override{
+      errs() << "\n(Information are displayed in file:line:column mode)\n\n";
+      errs() << "\033[0;36m======================================\033[0;0m\n";
+      errs() << "\033[0;36m=======   TRACKER STATISTICS   =======\033[0;0m\n";
+      errs() << "\033[0;36m======================================\033[0;0m\n";
+      errs() << "\033[0;32m Added " << numSTORE0ADDED << " STORE 0 Instruction\033[0;0m\n";
+      return false;
+   }
+
 
    };
  }

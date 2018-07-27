@@ -60,7 +60,6 @@ namespace {
       IRBuilder<> Builder(NextI);
       StoreInst* Store0 =  nullptr;
       int ID = AI.getType()->getElementType()->getTypeID();
-      errs() << *AI.getType()->getElementType() << "\n";
       switch (ID) {//each case allows to check the type and store 0 type get<Typename>Ty at @operand with volatile=true in order to survive other pass
 
 	 case Type::IntegerTyID:
@@ -100,21 +99,11 @@ namespace {
 	    break;
 
 	 case Type::VectorTyID:
-	    errs() << AI << "\n";
 	    //Store0 = Builder.CreateStore(ConstantDataVector::get(Type::getVectorTy(Builder.getContext()), 0), I, true);
 	    break;
 	 case Type::ArrayTyID:
 	    ArrayType* array = dyn_cast<ArrayType>(AI.getType()->getElementType());
 	    Builder.CreateStore(Constant::getNullValue(array), &AI, true);
-	    /*uint64_t elements = array->getNumElements();
-	    for(elements = 0; elements < array->getNumElements(); elements++){
-	       errs() << elements << "\n";
-	       Value* V = ConstantInt::get(Builder.getInt64Ty(), elements);
- 	       Value* val = Builder.CreateGEP(&AI, V);
-	       Value* toStore = Constant::getNullValue(array->getElementType());
-	       Builder.CreateStore(toStore, &AI, true);
-	    }*/
-
 	    break;
       }
 
@@ -122,12 +111,32 @@ namespace {
 	 errs() << "can't do my stuff\n";
       }
       else{
-	 errs() << "adding STORE 0 (after)\t\t\t";
-//	 I.getDebugLoc().print(errs());
-	 errs() << "\n";
+	 if(AI.getDebugLoc()){
+   	    errs() << "adding STORE 0 (after)\t\t\t";
+   	    AI.getDebugLoc().print(errs());
+   	    errs() << "\n";
+	 }
       }
       numSTORE0ADDED++;
    }
+
+
+   /**
+    * This function is used to display usefull information in order to sum up what have been done by our pass
+    * @function doFinalization the last function executed by our pass
+    * @param the current module
+    * @returns false because the code wasn't modified during its execution
+    **/
+   bool doFinalization(Module &M) override{
+      errs() << "\n(Information are displayed in file:line:column mode)\n\n";
+      errs() << "\033[0;36m======================================\033[0;0m\n";
+      errs() << "\033[0;36m=======   TRACKER STATISTICS   =======\033[0;0m\n";
+      errs() << "\033[0;36m======================================\033[0;0m\n";
+      errs() << "\033[0;32m Added " << numSTORE0ADDED << " STORE 0 Instruction\033[0;0m\n";
+      return false;
+   }
+
+
  };
 }
 
