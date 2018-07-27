@@ -1,0 +1,168 @@
+source_filename = "test305_nested_if.c"
+target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
+target triple = "x86_64-unknown-linux-gnu"
+
+@.str = private unnamed_addr constant [57 x i8] c"%d is the lowest, %d is in middle and %d is the highest\0A\00", align 1
+
+; Function Attrs: nounwind uwtable
+define void @displayer(i32, i32, i32) #0 {
+  %4 = alloca i32, align 4
+  %5 = alloca i32, align 4
+  %6 = alloca i32, align 4
+  store i32 %0, i32* %4, align 4
+  store i32 %1, i32* %5, align 4
+  store i32 %2, i32* %6, align 4
+  %7 = load i32, i32* %4, align 4
+  store volatile i32 0, i32* %4
+  %8 = load i32, i32* %5, align 4
+  store volatile i32 0, i32* %5
+  %9 = load i32, i32* %6, align 4
+  store volatile i32 0, i32* %6
+  %10 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([57 x i8], [57 x i8]* @.str, i32 0, i32 0), i32 %7, i32 %8, i32 %9)
+  ret void
+}
+
+declare i32 @printf(i8*, ...) #1
+
+; Function Attrs: nounwind uwtable
+define i32 @main() #0 {
+  %1 = alloca i32, align 4
+  %2 = alloca i32, align 4
+  %3 = alloca i32, align 4
+  %4 = alloca i32, align 4
+  store i32 0, i32* %1, align 4
+  %5 = call i64 @time(i64* null) #3
+  %6 = trunc i64 %5 to i32
+  call void @srand(i32 %6) #3
+  %7 = call i32 @rand() #3
+  store i32 %7, i32* %2, align 4
+  %8 = call i32 @rand() #3
+  store i32 %8, i32* %3, align 4
+  %9 = call i32 @rand() #3
+  store i32 %9, i32* %4, align 4
+  %10 = load i32, i32* %2, align 4
+  %11 = load i32, i32* %3, align 4
+  %12 = icmp slt i32 %10, %11
+  br i1 %12, label %13, label %35
+
+; <label>:13:                                     ; preds = %0
+  %14 = load i32, i32* %4, align 4
+  %15 = load i32, i32* %2, align 4
+  %16 = icmp slt i32 %14, %15
+  br i1 %16, label %17, label %21
+
+; <label>:17:                                     ; preds = %13
+  %18 = load i32, i32* %4, align 4
+  store volatile i32 0, i32* %4
+  %19 = load i32, i32* %2, align 4
+  store volatile i32 0, i32* %2
+  %20 = load i32, i32* %3, align 4
+  store volatile i32 0, i32* %3
+  call void @displayer(i32 %18, i32 %19, i32 %20)
+  br label %34
+
+; <label>:21:                                     ; preds = %13
+  %22 = load i32, i32* %4, align 4
+  %23 = load i32, i32* %3, align 4
+  %24 = icmp slt i32 %22, %23
+  br i1 %24, label %25, label %29
+
+; <label>:25:                                     ; preds = %21
+  %26 = load i32, i32* %2, align 4
+  store volatile i32 0, i32* %2
+  %27 = load i32, i32* %4, align 4
+  store volatile i32 0, i32* %4
+  %28 = load i32, i32* %3, align 4
+  store volatile i32 0, i32* %3
+  call void @displayer(i32 %26, i32 %27, i32 %28)
+  br label %33
+
+; <label>:29:                                     ; preds = %21
+  %30 = load i32, i32* %2, align 4
+  store volatile i32 0, i32* %2
+  %31 = load i32, i32* %3, align 4
+  store volatile i32 0, i32* %3
+  %32 = load i32, i32* %4, align 4
+  store volatile i32 0, i32* %4
+  call void @displayer(i32 %30, i32 %31, i32 %32)
+  br label %33
+
+; <label>:33:                                     ; preds = %29, %25
+  br label %34
+
+; <label>:34:                                     ; preds = %33, %17
+  br label %57
+
+; <label>:35:                                     ; preds = %0
+  %36 = load i32, i32* %4, align 4
+  %37 = load i32, i32* %3, align 4
+  %38 = icmp slt i32 %36, %37
+  br i1 %38, label %39, label %43
+
+; <label>:39:                                     ; preds = %35
+  %40 = load i32, i32* %4, align 4
+  store volatile i32 0, i32* %4
+  %41 = load i32, i32* %3, align 4
+  store volatile i32 0, i32* %3
+  %42 = load i32, i32* %2, align 4
+  store volatile i32 0, i32* %2
+  call void @displayer(i32 %40, i32 %41, i32 %42)
+  br label %56
+
+; <label>:43:                                     ; preds = %35
+  %44 = load i32, i32* %2, align 4
+  %45 = load i32, i32* %4, align 4
+  %46 = icmp slt i32 %44, %45
+  br i1 %46, label %47, label %51
+
+; <label>:47:                                     ; preds = %43
+  %48 = load i32, i32* %3, align 4
+  store volatile i32 0, i32* %3
+  %49 = load i32, i32* %2, align 4
+  store volatile i32 0, i32* %2
+  %50 = load i32, i32* %4, align 4
+  store volatile i32 0, i32* %4
+  call void @displayer(i32 %48, i32 %49, i32 %50)
+  br label %55
+
+; <label>:51:                                     ; preds = %43
+  %52 = load i32, i32* %3, align 4
+  store volatile i32 0, i32* %3
+  %53 = load i32, i32* %4, align 4
+  store volatile i32 0, i32* %4
+  %54 = load i32, i32* %2, align 4
+  store volatile i32 0, i32* %2
+  call void @displayer(i32 %52, i32 %53, i32 %54)
+  br label %55
+
+; <label>:55:                                     ; preds = %51, %47
+  br label %56
+
+; <label>:56:                                     ; preds = %55, %39
+  br label %57
+
+; <label>:57:                                     ; preds = %56, %34
+  store volatile i32 0, i32* %2
+  store volatile i32 0, i32* %4
+  store volatile i32 0, i32* %3
+  store volatile i32 0, i32* %1
+  ret i32 0
+}
+
+; Function Attrs: nounwind
+declare void @srand(i32) #2
+
+; Function Attrs: nounwind
+declare i64 @time(i64*) #2
+
+; Function Attrs: nounwind
+declare i32 @rand() #2
+
+attributes #0 = { nounwind uwtable "disable-tail-calls"="false" "less-precise-fpmad"="false" "no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "no-infs-fp-math"="false" "no-jump-tables"="false" "no-nans-fp-math"="false" "no-signed-zeros-fp-math"="false" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+fxsr,+mmx,+sse,+sse2,+x87" "unsafe-fp-math"="false" "use-soft-float"="false" }
+attributes #1 = { "disable-tail-calls"="false" "less-precise-fpmad"="false" "no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "no-infs-fp-math"="false" "no-nans-fp-math"="false" "no-signed-zeros-fp-math"="false" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+fxsr,+mmx,+sse,+sse2,+x87" "unsafe-fp-math"="false" "use-soft-float"="false" }
+attributes #2 = { nounwind "disable-tail-calls"="false" "less-precise-fpmad"="false" "no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "no-infs-fp-math"="false" "no-nans-fp-math"="false" "no-signed-zeros-fp-math"="false" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+fxsr,+mmx,+sse,+sse2,+x87" "unsafe-fp-math"="false" "use-soft-float"="false" }
+attributes #3 = { nounwind }
+
+!llvm.ident = !{!0}
+
+!0 = !{!"clang version 3.9.1 (tags/RELEASE_391/final 334690)"}

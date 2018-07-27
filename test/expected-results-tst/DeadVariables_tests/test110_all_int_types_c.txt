@@ -1,0 +1,51 @@
+source_filename = "test110_all_int_types_c.c"
+target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
+target triple = "x86_64-unknown-linux-gnu"
+
+; Function Attrs: nounwind uwtable
+define i64 @f1() #0 {
+  ret i64 30
+}
+
+; Function Attrs: nounwind uwtable
+define i64 @f2() #0 {
+  ret i64 12
+}
+
+; Function Attrs: nounwind uwtable
+define signext i16 @f3() #0 {
+  ret i16 8
+}
+
+; Function Attrs: nounwind uwtable
+define zeroext i16 @f4() #0 {
+  ret i16 200
+}
+
+; Function Attrs: nounwind uwtable
+define i32 @f5() #0 {
+  ret i32 42
+}
+
+; Function Attrs: nounwind uwtable
+define i64 @f6() #0 {
+  ret i64 -15
+}
+
+; Function Attrs: nounwind uwtable
+define i32 @main() #0 {
+  %1 = call i64 @f1()
+  %2 = call i64 @f2()
+  %3 = call signext i16 @f3()
+  %4 = call zeroext i16 @f4()
+  %5 = call i32 @f5()
+  %6 = call i64 @f6()
+  %7 = call i64 @f1()
+  ret i32 0
+}
+
+attributes #0 = { nounwind uwtable "disable-tail-calls"="false" "less-precise-fpmad"="false" "no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "no-infs-fp-math"="false" "no-jump-tables"="false" "no-nans-fp-math"="false" "no-signed-zeros-fp-math"="false" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+fxsr,+mmx,+sse,+sse2,+x87" "unsafe-fp-math"="false" "use-soft-float"="false" }
+
+!llvm.ident = !{!0}
+
+!0 = !{!"clang version 3.9.1 (tags/RELEASE_391/final 334690)"}
