@@ -27,26 +27,28 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Analysis/LoopInfo.h"
 
+//TODO faire un parcours de l'arbre à l'envers en stockant les load et les store uniquement
 using namespace llvm;
 
 namespace {
- struct DoubleStoreInstr : public ModulePass {
+ struct DoubleStoreInstr : public FunctionPass {
 
    static char ID;
    static int numSTORE0ADDED;//The number of instruction STORE 0 added
    static int numSTOREDELETED;//The number of useless STORE removed
 
-   DoubleStoreInstr() : ModulePass(ID) {}
+   DoubleStoreInstr() : FunctionPass(ID) {}
 /**
- * @function runOnModule override
- * should also work with runOnFunction
- * @param Module M, the current module
+ * @function runOnFunction override
+ * also works with runOnModule
+ * @param Function F, the current function
  * @returns true since the code was modified in order to add the store 0 instructions
  **/
 
-   bool runOnModule(Module &M) override {
-      for(Function &F : M){
+   bool runOnFunction(Function &F) override {
+
 	 SmallVector<Instruction*, 64> storage;
 	 int cpt1 = 0;
 	 int cpt2 = 0;
@@ -56,7 +58,7 @@ namespace {
 	    for(Instruction &I : B){
 	       storage.push_back(&I);
 	       cpt1++;
-	       //loop handler, still not perfectly operational
+	       //array handler, still not perfectly operational
 	       /*
 	       if(addStoreSize){
 		     IRBuilder<> Builder(storage[cpt1-1]);
@@ -95,8 +97,6 @@ namespace {
 	       }
 	       cpt2--;
 	    }
-
-      }
       return true;
    }
 
@@ -126,7 +126,7 @@ namespace {
     * @param i the index of the instruction with the type of our store 0 
     * @param place, the index where the instruction is to be placed
     * @param operand, the address where we need to store our value
-    * @return the new instruction, in order to ve added to the storage vector and for debug purposes
+    * @returns the new instruction, in order to ve added to the storage vector and for debug purposes
     **/ 
    StoreInst* addStore0(SmallVector<Instruction*, 64> &storage, int i, Value* operand, int place){
       IRBuilder<> Builder(storage[place]);
@@ -210,8 +210,6 @@ namespace {
 	 if(storage[count]->getOpcode == 31 && storage[count]->getOperand(1) == operand){
    */
 
-
-
   /**
     * This function updates the vectore storage, calling if necessary the Store0 function and deleting pointless store instructions
     * @param storage, a vector with all the instructions before the current one in the block
@@ -227,22 +225,18 @@ namespace {
       int i = size - 1;
       if(I.getOpcode() == 31){
       	 while(i >= 0){
-	    if(storage[i]->getNumOperands() == 0){
-	       return;
-	    }
-           if(operand == storage[i]->getOperand(storage[i]->getNumOperands()-1)){//if the adress where the value is stored/load is the same
-	      if(storage[i]->getOpcode() == 31){//31 stands for store
-		 Instruction *SI = dyn_cast<Instruction>(storage[i]);
-		 if(storage[i]->getParent() == I.getParent()){
-   		    errs() << "erasing instruction\t\t\t";
-   		    SI->getDebugLoc().print(errs());
-   		    errs() << "\n";
-   		    storage[i]->eraseFromParent();
-   		    storage.erase(storage.begin()+i);	 
-   		    size--;
-   		    numSTOREDELETED++;
-		 }
-   		 return;
+ 	    if(storage[i]->getNumOperands() != 0 && operand == storage[i]->getOperand(storage[i]->getNumOperands()-1)){//if the adress where the value is stored/load is the same
+ 	       if(storage[i]->getOpcode() == 31){//31 stands for store
+ 		  if(storage[i]->getParent() == I.getParent()){
+ 		     errs() << "erasing instruction\t\t\t";
+ 		     storage[i]->getDebugLoc().print(errs());
+ 		     errs() << "\n";
+ 		     storage[i]->eraseFromParent();
+ 		     storage.erase(storage.begin()+i);	 
+ 		     size--;
+ 		     numSTOREDELETED++;
+ 		  }
+ 		  return;
 	      }
 	      if(storage[i]->getOpcode() == 30){//30 stands for load
 		 if(GlobalVariable* GV = dyn_cast<GlobalVariable>(operand)){
@@ -318,6 +312,14 @@ namespace {
    }
 
 
+   /**
+    * @function addUniqueUntreated:
+    * This function adds myBB to the BasicBlock vector if it is not already in it and if it was not treated e.g in BBTreated
+    * @param BBVect, the vector where the Block is to be added (if necessary) 
+    * @param myBB, the block to add
+    * @param BBTreated, the block already treated before and therefore no longer modification-friendly
+    **/
+
    void addUniqueUntreated(SmallVector<BasicBlock*, 16> &BBVect, BasicBlock& myBB, SmallVector<BasicBlock*, 16> &BBTreated){
       int limit = BBVect.end() - BBVect.begin() - 1;
       while(limit >= 0){
@@ -336,6 +338,14 @@ namespace {
       BBVect.push_back(&myBB);
    }
 
+
+   /**
+    * @function removeAlSeen
+    * This function removes the BasicBlock if it was already visited
+    * @param BBVect, a vector containing the Blocks to handle
+    * @param BB, the basic block to remove
+    **/
+
    void removeAlSeen(SmallVector<BasicBlock*, 16>& BBVect, BasicBlock& BB){
       int limit = BBVect.end() - BBVect.begin() - 1;
       while(limit >= 0){
@@ -346,6 +356,79 @@ namespace {
       }
    }
 
+
+   /**
+    * @function isAtZeroInTheBlock:
+    * This function checks whether or not the value pointed by operand is set to 0 at the end of the program
+    * @param lastBasicBlock, the bloc containing the return or exit of the function
+    * @param operand the value pointed by the handled variable
+    **/
+
+   bool isAtZeroInTheBlock(BasicBlock &lastBasicBlock, Value* operand){
+      bool retValue = false;
+      for(Instruction &I : lastBasicBlock){
+	 if(I.getNumOperands() != 0 && I.getOperand(I.getNumOperands() - 1) == operand && (I.getOpcode() == 31 || I.getOpcode() == 30)){
+	    if(Constant* C = dyn_cast<Constant>(I.getOperand(0))){
+	       if(C->isNullValue()){
+		  retValue = true;
+	       }
+	       else{
+		  retValue = false;
+	       }
+	    }
+	    else{
+   	       retValue = false;
+	    }
+	 }
+      }
+      return retValue;
+   }
+
+   /**
+    * @function isAStore0Inst:
+    * tests if the Instruction I is a Store 0
+    * @param I an Instruction
+    * @returns true if the Instruction I is a Store 0 instruction, false elsewhere
+    **/
+
+   bool isAStore0Inst(Instruction& I){
+      if(I.getOpcode() == 31){
+	 if(Constant* C = dyn_cast<Constant>(I.getOperand(0))){
+	    if(C->isNullValue()){
+	       return true;
+	    }
+	 }
+      }
+      return false;
+   }
+
+   //void putAtZeroInAllBlocks(operand){
+
+   bool hasABranch(BasicBlock &B){
+      if(BranchInst* BINP = dyn_cast<BranchInst>(B.getTerminator())){
+	 return true;
+      }
+      return false;
+   }
+
+   int getIndexBlockBegin(BasicBlock& BB, SmallVector<Instruction*, 64> &storage, bool nextToEnd=true){
+      int cpt = 0;
+      if(nextToEnd){
+	 cpt = storage.end() - storage.begin() - 1;
+      }
+      Instruction* goal = BB.getFirstNonPHI();
+      while(storage[cpt] != goal){
+	 if(nextToEnd){
+	    cpt--;
+	 }
+	 else{
+	    cpt++;
+	 }
+      }
+      return cpt;
+   }
+
+
    /**
     * This function adds Store0 instructions at the end of compilation:
     * If a variable is no longer of any use, we put its value to 0
@@ -355,13 +438,15 @@ namespace {
     * @returns nothing, but adds store 0 instruction for each variable which was of any use
     **/
    void addLastStore(SmallVector<Instruction*, 64> &storage, Instruction &I, int k){
+      if(isAStore0Inst(I)){
+	 return;
+      }
       int cpt = storage.end() - storage.begin() - 1;
       Value* operand = I.getOperand(I.getNumOperands() - 1);
       
       BasicBlock* BBI = I.getParent();
       SmallVector<BasicBlock*, 16> alreadySeen;//allows a better tree traversal without infinite loops
       SmallVector<BasicBlock*, 16> toTreat;//Blocks not treated at the moment
-      alreadySeen.push_back(BBI);
       toTreat.push_back(BBI);
       Instruction* blockEnd = BBI->getTerminator();
       
@@ -374,49 +459,78 @@ namespace {
 	 }
 	 instIndex++;
       }
+      bool isToAddAtTheEnd = true;
       while(toTreat.begin() != toTreat.end()){
-      BBI = toTreat[0];
-      while(BBI != nullptr){
-	 if(firstInst){
-	    firstInst = false;
+   	 BBI = toTreat[0];
+	 if(isAtZeroInTheBlock(*BBI, operand) || isAtZeroInTheBlock(*storage[cpt]->getParent(), operand) || !hasABranch(*BBI)){
+	    isToAddAtTheEnd = false;
 	 }
 	 else{
-   	    for(Instruction &Ins : *BBI){
-   	       if(Ins.getNumOperands() != 0 && operand == Ins.getOperand(Ins.getNumOperands()-1) && &I != &Ins){
-		  return;
+	    isToAddAtTheEnd = true;
+	 }
+   	 while(BBI != nullptr){
+   	    if(firstInst){
+   	       firstInst = false;
+   	    }
+   	    else{
+   	       for(Instruction &Ins : *BBI){
+   		  if(Ins.getNumOperands() != 0 && operand == Ins.getOperand(Ins.getNumOperands()-1) && &I != &Ins){
+		     if(Ins.getOpcode() == 31 && !isAStore0Inst(I)){
+			isToAddAtTheEnd = false;
+			BBI = nullptr;
+			break;
+			/*
+			StoreInst* Store0 = addStore0(storage, k, operand, k + 1);
+			if(Store0 != nullptr){
+			   storage.insert(storage.begin() + k + 1, Store0);
+			}
+			return;
+   		     */}
+		     if(I.getOpcode() == 31 && Ins.getOpcode() == 30){
+			return;
+		     }
+		     isToAddAtTheEnd = true;
+		     BBI == nullptr;
+   		     break;
+		  }
+	       }
+   	    }
+	    if(BBI == nullptr){
+	       removeAlSeen(toTreat, *toTreat[0]);
+	       break;
+	    }
+   	    if(BranchInst *Binst = dyn_cast<BranchInst>(BBI->getTerminator())){
+   	       bool aSeen = false;
+   	       int bBlockCpt = 0;
+   	       BasicBlock* futureBlock = Binst->getSuccessor(0);
+   	       int succToAdd = Binst->getNumSuccessors() - 1;
+   	       while(succToAdd >= 0){
+   		  addUniqueUntreated(toTreat, *(Binst->getSuccessor(succToAdd)), alreadySeen);
+   		  succToAdd--;
+   	       }
+   	       while(bBlockCpt < (alreadySeen.end() - alreadySeen.begin() - 1)){
+   		  if(alreadySeen[bBlockCpt] == futureBlock){
+   		     aSeen = true;
+   		     break;
+   		  }
+   		  bBlockCpt++;
+   	       }
+   	       if(aSeen){
+   		  removeAlSeen(toTreat, *BBI);
+		  BBI = nullptr;
+   	       }
+   	       else{
+   		  removeAlSeen(toTreat, *BBI);
+   		  BBI = futureBlock;
+   		  alreadySeen.push_back(BBI);
    	       }
    	    }
-	 }
-	 if(BranchInst *Binst = dyn_cast<BranchInst>(BBI->getTerminator())){
-	    bool aSeen = false;
-	    int bBlockCpt = 0;
-	    BasicBlock* futureBlock = Binst->getSuccessor(0);
-	    int succToAdd = Binst->getNumSuccessors() - 1;
-	    while(succToAdd >= 0){
-	       addUniqueUntreated(toTreat, *(Binst->getSuccessor(succToAdd)), alreadySeen);
-	       succToAdd--;
-	    } 
-	    while(bBlockCpt < (alreadySeen.end() - alreadySeen.begin() - 1)){
-	       if(alreadySeen[bBlockCpt] == futureBlock){
-		  aSeen = true;
-	       }
-	       bBlockCpt++;
-	    }
-	    if(aSeen){
+   	    else{
 	       removeAlSeen(toTreat, *BBI);
-	       BBI = nullptr;
+	       isToAddAtTheEnd = false;
+   	       BBI = nullptr;
 	    }
-	    else{
-	       removeAlSeen(toTreat, *BBI);
-	       BBI = futureBlock;
-	       alreadySeen.push_back(BBI);		  
-	    }
-	 }
-	 else{
-	    removeAlSeen(toTreat, *BBI);
-	    BBI = nullptr;
-	 }
-      }
+   	 }
       }
 
       if(Instruction* Inst = dyn_cast<Instruction>(operand)){
@@ -434,7 +548,7 @@ namespace {
 			   if(allEqual){//and the address is the same
 			      return;//then no use to add a store 0 instruction cause it will be added after the matching load
 			//Store Inst* Store0 = addStore0(storage, cpt, operand cpt+1) technically useless
-   		     }
+			   }
 			}
    		  }
 	       }
@@ -448,34 +562,20 @@ namespace {
 	    return;
 	 }
       }
-      cpt = storage.end() - storage.begin() - 1;
-      while(cpt >= k){
-	 if(storage[cpt]->getOpcode() == 2){//if there is a jump between instructions
-	    //The "unconditionnal jumps" (enter in a do while loop or even enter in the comparison block) only have 1 operand while the conditionnal ones have 3 (test, if true, if false)
-	    int type_label = storage[cpt]->getNumOperands();
-	    if(type_label == 1){
-	       Value* labelOperandToGo = storage[cpt]->getOperand(0);//get the address to jump if true
-	       if(BasicBlock* BINP = dyn_cast<BasicBlock>(labelOperandToGo)){
-		  for(Instruction &INP : *BINP){
-		     if(INP.getOpcode() == 30 && INP.getOperand(0) == operand){
-			StoreInst* Store0 = addStore0(storage, k, operand, cpt+1);
-			return;
-		     }
-		  }
-	       }
-	    }
-	 }
-	 cpt--;
-      }
-      /*
-      if(GlobalVariable* GV = dyn_cast<GlobalVariable>(operand)){
-	 return;
-      }
-*/
+
       if(Value* V = dyn_cast<Value>(I.getOperand(0))){//asserts that the Constant cast is anihilated
+	 if(!isToAddAtTheEnd){
  	 StoreInst* Store0 = addStore0(storage, k, operand, k+1);
 	 if (Store0 != nullptr){
-   	    storage.push_back(Store0);
+   	    storage.insert(storage.begin() + k + 1, Store0);
+	 }
+	 }
+	 else{
+		     StoreInst* Store0 = addStore0(storage, k, operand, getIndexBlockBegin(*storage[cpt]->getParent(), storage));
+   		     if(Store0 != nullptr){
+   			storage.insert(storage.begin() + cpt, Store0);
+   		     }
+		     return;
 	 }
       }
    }
