@@ -47,3 +47,6 @@ build/
 test/src-test-files/basic_c_tests/*.txt
 test/src-test-files/c_cond_tests/*.txt
 test/src-test-files/c_array_tests/*.txt
+
+#some fails i left in case they prove to be usefull
+DoubleStore/DoubleStore.cpp
