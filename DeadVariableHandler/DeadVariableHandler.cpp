@@ -28,8 +28,9 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/Analysis/LoopInfoImpl.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/Analysis/LoopInfo.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/Analysis/PostDominators.h"
 
 using namespace llvm;
 
@@ -43,6 +44,8 @@ namespace {
    bool runOnFunction(Function &F) override {
       SmallVector <Instruction*,16> storage;
       SmallVector <BasicBlock*, 8> blocksInLoop;
+      SmallVector <Instruction*, 8> references;
+      SmallVector <Instruction*, 8> arrayHandler;
       LoopInfo& loopData = getAnalysis<LoopInfoWrapperPass>().getLoopInfo();
       for(BasicBlock &BB : F){
 	 if(loopData.isLoopHeader(&BB)){
@@ -53,42 +56,65 @@ namespace {
       bool isFirstBlock = false;//is the current basic block the first one?
       Instruction* I = F.back().getTerminator();//I is the last instruction of the function
       Function::iterator itBlock = --F.end();
+      DominatorTree& DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
+      DT.print(errs());
+/*      for(auto node = GraphTraits<DominatorTree *>::nodes_begin(DT); node != GraphTraits<DominatorTree *>::nodes_end(DT); ++node){
+	 BasicBlock *BB = node->getBlock();
+	 errs() << *BB << "\n";
+      }*/
       while(itBlock != F.begin() || !isFirstBlock){
    	 BasicBlock* BB = dyn_cast<BasicBlock>(itBlock);
    	 I = BB->getTerminator();
    	 while(I != nullptr){
    	    if(I->getOpcode() == 30 || I->getOpcode() == 31){
       	       if(AllocaInst *AI = dyn_cast<AllocaInst>(I->getOperand(I->getNumOperands() - 1))){
+		  if(I->getOpcode() == 31 && I->getOperand(0)->getType()->getTypeID() == Type::PointerTyID){
+		     references.push_back(I);
+		  }
    		  storage.push_back(I);
    		  storageSize++;
 	       }
    	    }
+	    if(I->getOpcode() == 32){
+	       errs() << I->getNumOperands() << "\n";
+	       arrayHandler.push_back(I);
+	    }
    	    I = I->getPrevNode();	 //'new' I is now the instruction right before 'old' I.
 	 }
        	 if(itBlock == F.begin()){
     	    isFirstBlock = true;//since we move from the last to the first, we need to know when we reach the beginning
-    	 } 
+    	 }
 	 else{
 	    itBlock--;//goes to the previous block
 	 }
       }
       int cpt = 0;
-      while(cpt <= storageSize - 1){//Look in all the instruction
-	 int cpt_bis = 0;
+      Instruction* currentInst = nullptr;
+      if(storageSize > 0){
+   	 currentInst = storage[cpt];
+      }
+      while(currentInst != nullptr){//Look in all the instruction
+ 	 int cpt_bis = 0;
 	 bool isEverUsedAfter = false;//is the variable used, at least once after this instruction
+	 bool locked = false;
 	 bool loadedInHeader = false;//is the variable loaded in a loop header
-	 if(isLoadedInHeader(blocksInLoop, storage[cpt])){//if the variable is loaded in a header, we cannot put its value to 0 due to the return to the conditional point
+	 if(isLoadedInHeader(blocksInLoop, currentInst)){//if the variable is loaded in a header, we cannot put its value to 0 due to the return to the conditional point
 	    loadedInHeader = true;
 	    isEverUsedAfter = true;//hence, we can say that the variable might be reused if the loop condition is true which can't be determined at compile time
 	 }
-	 while(cpt_bis < cpt){//for all the store/load instruction after the current one 
-	    if(storage[cpt_bis]->getOperand(storage[cpt_bis]->getNumOperands() - 1) == storage[cpt]->getOperand(storage[cpt]->getNumOperands() - 1)){
+	 while(cpt_bis < cpt){//for all the store/load instruction after the current one
+	    if(isLocked(references, currentInst->getOperand(currentInst->getNumOperands() - 1))){
+	       isEverUsedAfter = true;
+	       locked = true;
+	       break;
+	    }
+	    if(storage[cpt_bis]->getOperand(storage[cpt_bis]->getNumOperands() - 1) == currentInst->getOperand(currentInst->getNumOperands() - 1)){
 	       //if the register is the same
 	       isEverUsedAfter = true;//the variable is reused
-	       if(storage[cpt_bis]->getOpcode() == 31 && storage[cpt_bis]->getParent() == storage[cpt]->getParent() && !isAStore0Inst(*storage[cpt])){
+	       if(storage[cpt_bis]->getOpcode() == 31 && storage[cpt_bis]->getParent() == currentInst->getParent() && !isAStore0Inst(*currentInst)){
 		  //if the value is overwritten, we can put it to 0 just after the first write
 		  //technically, dse asserts that we cannot enter into this state
-		  addStore0(*storage[cpt]);
+		  addStore0(*currentInst);
 		  break;
 	       }
 	       if(storage[cpt_bis]->getOpcode() == 31 && !loadedInHeader){
@@ -96,7 +122,7 @@ namespace {
 	       }
 	       if(storage[cpt_bis]->getOpcode() == 30){//if the value is loaded
 		  SmallVector<BasicBlock*, 8> futureStack;
-		  if(isInSuccessor(*storage[cpt]->getParent(), *storage[cpt_bis]->getParent(), futureStack)){//in a block accessible from the current one
+		  if(isInSuccessor(*currentInst->getParent(), *storage[cpt_bis]->getParent(), futureStack)){//in a block accessible from the current one
 		     break;//we shall not pass !
 		  }
 		  isEverUsedAfter = false;//elsewhere the value in itself is not reused since the block where it will be loaded is not reachable from the block we are currently visiting
@@ -104,21 +130,51 @@ namespace {
 	    }
 	    cpt_bis++;
 	 }
-	 if(!isEverUsedAfter && !isAtZeroInTheBlock(*storage[cpt]->getParent(), storage[cpt]->getOperand(storage[cpt]->getNumOperands() - 1))){//if the variable is not used anymore and is not already at 0
-	    addStore0(*storage[cpt]);
+	 if(!isEverUsedAfter && !isAtZeroInTheBlock(*currentInst->getParent(), currentInst->getOperand(currentInst->getNumOperands() - 1))){//if the variable is not used anymore and is not already at 0
+	    addStore0(*currentInst);
 	 }
-	 if(!isAtZeroInTheBlock(F.back(), storage[cpt]->getOperand(storage[cpt]->getNumOperands() - 1))){//whatever the case is, we put the value at 0 at the end of the program to make sure that it is really erased once and for all
-   	    addStore0(*storage[cpt], storage[cpt]->getOperand(storage[cpt]->getNumOperands() - 1), F.back().getTerminator());
+	 if(!locked && !isAtZeroInTheBlock(F.back(), currentInst->getOperand(currentInst->getNumOperands() - 1))){//whatever the case is, we put the value at 0 at the end of the program to make sure that it is really erased once and for all
+   	    addStore0(*currentInst, currentInst->getOperand(currentInst->getNumOperands() - 1), F.back().getTerminator());
 	 }
-	 cpt++;
+	 ++cpt;
+	 if(cpt < storageSize){
+	    currentInst = getUnlockedInstruction(references, currentInst);
+	    if(currentInst  == nullptr){
+   	       currentInst = storage[cpt];
+	    }
+	 }
+	 else{
+	    currentInst = nullptr;
+	 }
       }
       return true;
    }
 
    virtual void getAnalysisUsage(AnalysisUsage& AU) const override {
       AU.addRequired<LoopInfoWrapperPass>();
+      AU.addRequired<DominatorTreeWrapperPass>();
    }
   
+   Instruction* getUnlockedInstruction(SmallVector<Instruction*, 8>&references, Instruction *currentInst){
+      return nullptr;
+   }
+   void declareAllRefDead(SmallVector<Instruction*, 8> &references, Value* V, Instruction &Iplace){
+      int cpt = references.end() - references.begin();
+      bool isAtZero = false;
+      while(cpt){
+	 if(references[cpt-1]->getOperand(1) == V){
+	    if(!isAtZero){
+	       isAtZero = true;
+	       Instruction* INP = dyn_cast<Instruction>(references[cpt-1]->getOperand(0));
+	       if(INP != nullptr){
+		  addStore0(*INP, references[cpt-1]->getOperand(0), &Iplace);
+	       }
+	    }
+	    references.erase(references.begin() + (cpt-1));
+	 }
+	 cpt--;
+      }
+   }
 
    /**
     * @function isAStore0Inst:
@@ -191,7 +247,7 @@ namespace {
       while(BB != nullptr){
 	 if(isInSmallBasicBlockVect(HeaderBBlocks, *BB)){
 	    for(Instruction &I : *BB){
-	       if(I.getOpcode() == 30 && I.getOperand(0) == Ins->getOperand(Ins->getNumOperands() - 1)){
+	       if((I.getOpcode() == 30 || I.getOpcode() == 31) && I.getOperand(0) == Ins->getOperand(Ins->getNumOperands() - 1)){
 		  return true;
 	       }
 	    }
@@ -299,7 +355,12 @@ namespace {
 	    break;
 
 	 case Type::PointerTyID:
-	    Store0 = Builder.CreateStore(Constant::getNullValue(cast<PointerType>(I.getType())), V, true);
+	    if(I.getOpcode() == 30){
+   	       Store0 = Builder.CreateStore(Constant::getNullValue(cast<PointerType>(I.getType())), V, true);
+	    }
+	    else{
+	       Store0 = Builder.CreateStore(Constant::getNullValue(cast<PointerType>(I.getOperand(0)->getType())), V, true);
+	    }
 	    break;
 
 	 case Type::VectorTyID:
@@ -340,7 +401,35 @@ namespace {
       return false;
    }
 
+   /**
+    * @function hasReferences:
+    * checks if the Value has a reference e.g if the value was stored in a pointer to be used in another way after
+    * @precond ref only contains store instructions of references
+    * @param ref a small vector with all the references of the function
+    * @param V the value pointing to the current variable we're handling
+    * @returns true if V is a pointer over a variable, false elsewhere
+    **/
+   bool isReference(SmallVector<Instruction*, 8> &ref, Value* V){
+      int cpt = ref.end() - ref.begin();
+      while(cpt){
+	 if(ref[cpt-1]->getOperand(1) == V){
+	    return true;
+	 }
+	 cpt--;
+      }
+      return false;
+   }
 
+   bool isLocked(SmallVector<Instruction*, 8> references, Value *V){
+      int cpt = references.end() - references.begin() - 1;
+      while(cpt >= 0){
+	 if(references[cpt]->getOperand(0) == V){
+	    return true;
+	 }
+	 cpt--;
+      }
+      return false;
+   }
    };
  }
 
