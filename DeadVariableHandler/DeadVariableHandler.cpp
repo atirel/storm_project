@@ -22,6 +22,7 @@
 
 
 
+#include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/IRBuilder.h"
@@ -31,6 +32,7 @@
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Analysis/PostDominators.h"
+#include <utility>
 
 using namespace llvm;
 
@@ -41,15 +43,29 @@ namespace {
    static int numSTORE0ADDED;//The number of instruction STORE 0 added
 
    DeadVariableHandler() : FunctionPass(ID) {}
+
    bool runOnFunction(Function &F) override {
+
+      /*std::pair <Value*, bool> tuple_test;
+      tuple_test = std::make_pair (F.back().getTerminator(), false);
+
+      testing some stuff
+
+      **/
+
       SmallVector <Instruction*,16> storage;
       SmallVector <BasicBlock*, 8> blocksInLoop;
       SmallVector <Instruction*, 8> references;
       SmallVector <Instruction*, 8> arrayHandler;
+
       LoopInfo& loopData = getAnalysis<LoopInfoWrapperPass>().getLoopInfo();
+      
       for(BasicBlock &BB : F){
 	 if(loopData.isLoopHeader(&BB)){
 	    blocksInLoop.push_back(&BB);
+	 }
+	 if(loopData.getLoopFor(&BB)){
+	    errs() << BB << "\n";
 	 }
       }
       int storageSize = 0;
@@ -58,10 +74,10 @@ namespace {
       Function::iterator itBlock = --F.end();
       DominatorTree& DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
       DT.print(errs());
-/*      for(auto node = GraphTraits<DominatorTree *>::nodes_begin(DT); node != GraphTraits<DominatorTree *>::nodes_end(DT); ++node){
+      errs() << DT.getRootNode();
+      for(auto node = GraphTraits<DominatorTree *>::nodes_begin(&DT); node != GraphTraits<DominatorTree *>::nodes_end(&DT); ++node){
 	 BasicBlock *BB = node->getBlock();
-	 errs() << *BB << "\n";
-      }*/
+      }
       while(itBlock != F.begin() || !isFirstBlock){
    	 BasicBlock* BB = dyn_cast<BasicBlock>(itBlock);
    	 I = BB->getTerminator();
@@ -76,7 +92,6 @@ namespace {
 	       }
    	    }
 	    if(I->getOpcode() == 32){
-	       errs() << I->getNumOperands() << "\n";
 	       arrayHandler.push_back(I);
 	    }
    	    I = I->getPrevNode();	 //'new' I is now the instruction right before 'old' I.
