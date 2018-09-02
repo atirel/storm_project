@@ -32,6 +32,7 @@
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Analysis/PostDominators.h"
+#include <algorithm>
 #include <utility>
 #include "PutAtZero.h"
 
@@ -83,7 +84,7 @@ namespace {
 
 	 else{
 	    for(auto itBlock = succ_begin(header), itBlock_end = succ_end(header); itBlock != itBlock_end; itBlock++){
-	       if(blockList[*itBlock] == white){
+	       if(blockList[*itBlock] == white && !hasAssertFail(*itBlock)){
 		  toTreat.push_back(header);
 		  I = nullptr;
 		  break;
@@ -103,7 +104,90 @@ namespace {
 	 }
 	 toTreat.pop_front();
       }//end while
+      array_handler(F);
       return true;
+   }
+
+   bool hasAssertFail(BasicBlock* BB){
+      Instruction* I = BB->getTerminator();
+      while(I != nullptr){
+	 if(UnreachableInst* CI = dyn_cast<UnreachableInst>(I)){
+	    return true;
+	 }
+	 I = I->getPrevNode();
+      }
+      return false;
+   }
+
+   void array_handler(Function& F){
+      std::vector<BasicBlock*> dominator_blocks;
+      std::vector<AllocaInst*> atZeroArrays;
+      DominatorTree& DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
+      BasicBlock* BB = &F.back();
+      dominator_blocks.push_back(BB);
+      while(BB != nullptr){
+	 if(BasicBlock* B_new = BB->getSinglePredecessor()){
+	    dominator_blocks.push_back(B_new);
+	    BB = B_new;
+	 }
+	 else{
+   	    auto it = pred_begin(BB), it_end = pred_end(BB);
+	    if(it != it_end){
+   	       B_new = *it;
+	    }
+   	    while(it != it_end){
+	       B_new = DT.findNearestCommonDominator(B_new, *it);
+	       it++;
+	    }
+	    if(B_new != nullptr){
+   	       dominator_blocks.push_back(B_new);
+	    }
+	    BB = B_new;
+	 }
+      }
+
+      BB = &F.back();
+      while(BB != nullptr){
+	 Instruction* I = BB->getTerminator();
+	 while(I != nullptr){
+	    if(I->getOpcode() == 32){
+	       if(AllocaInst* AI = dyn_cast<AllocaInst>(I->getOperand(0))){
+		  if(std::find(atZeroArrays.begin(), atZeroArrays.end(), AI) == atZeroArrays.end()){
+   		     dead_array(I, dominator_blocks, DT);
+   		     atZeroArrays.push_back(AI);
+		  }
+	       }
+	    }
+	    I = I->getPrevNode();
+	 }
+	 BB = BB->getPrevNode();
+      }
+   }
+
+   bool isInVect(AllocaInst* AI, std::vector<AllocaInst*> &alreadyDeadArray){
+      for(auto it = alreadyDeadArray.begin(), end = alreadyDeadArray.end(); it != end; ++it){
+	 if(*it == AI){
+	    return true;
+	 }
+      }
+   }
+
+   void dead_array(Instruction* I, std::vector<BasicBlock*> &dominators, DominatorTree &DT){
+   	 BasicBlock* BB = I->getParent();
+	 Instruction* place = I->getNextNode();
+	 if(std::find(dominators.begin(), dominators.end(), BB) != dominators.end()){
+	    addStore0(*I, I->getOperand(0), place);
+	    return;
+	 }
+   	 for(auto it = dominators.begin(), end = dominators.end(); it != end; ++it){
+   	    if(DT.properlyDominates(BB, *it)){
+   	       place = (*it)->front().getNextNode();
+	    }
+	    else{
+	       addStore0(*I, I->getOperand(0), place);
+	       return;
+	    }
+	 }
    }
 
    void loop_handler(InstructionList &iList, BlockList &bList, Loop* loop){
@@ -231,6 +315,7 @@ namespace {
     **/
    virtual void getAnalysisUsage(AnalysisUsage& AU) const override{
       AU.addRequired<LoopInfoWrapperPass>();
+      AU.addRequired<DominatorTreeWrapperPass>();
    }
 
    /**
@@ -288,7 +373,7 @@ namespace {
 	 while(I != nullptr){
 	    if(I->getOpcode() == 30 || I->getOpcode() == 31){
 	       if(AllocaInst* AI = dyn_cast<AllocaInst>(I->getOperand(I->getNumOperands() - 1))){
-	 	  if(setter(&iList, AI, I, BB) && !isAStore0Inst(*I) && !isAStore0Inst(*(I->getNextNode()))){
+	 	  if(setter(iList, AI, I, BB) && !isAStore0Inst(*I) && !isAStore0Inst(*(I->getNextNode()))){
 	 	     addStore0(*I);
 		  }
 	       }
@@ -298,39 +383,40 @@ namespace {
       }
    }
 
-   bool setter(InstructionList *iList, AllocaInst* AI, Instruction *I, BasicBlock* BB){
-      for(int k = 0; k < (*iList)[BB].size(); ++k){
-	 if((*iList)[BB][k].first == AI){
-	    if((*iList)[BB][k].second){
+   bool setter(InstructionList &iList, AllocaInst* AI, Instruction *I, BasicBlock* BB){
+      for(int k = 0; k < iList[BB].size(); ++k){
+	 if(iList[BB][k].first == AI){
+	    if(iList[BB][k].second){
 	       if(I->getOpcode() == 30){
-		  (*iList)[BB][k].second = false;
+		  iList[BB][k].second = false;
 	       }
 	       return true;
 	    }
 	    else{
 	       if(I->getOpcode() == 31){
-		  (*iList)[BB][k].second = true;
+		  iList[BB][k].second = true;
 	       }
 	       return false;
 	    }
 	 }
-	 ++k;
       }
       if(I->getOpcode() == 30){
 	 AllocaInst* AI = dyn_cast<AllocaInst>(I->getOperand(0));
 	 IsDead varia;
  	 varia.first = AI;
 	 varia.second = false;
-	 errs() << "new variable " << *AI << "\n";
-	 (*iList)[BB].push_back(varia);
+	// errs() << "new variable " << *AI;
+	 iList[BB].push_back(varia);
+	// errs() << iList[BB].size() << "\n";
       }
       else{
 	 AllocaInst* AI = dyn_cast<AllocaInst>(I->getOperand(1));
 	 IsDead varia;
 	 varia.first = AI;
 	 varia.second = true;
-	 errs() << "new variable " << *AI << "\n";
-	 (*iList)[BB].push_back(varia);
+	// errs() << "new variable " << *AI;
+	 iList[BB].push_back(varia);
+	// errs() << iList[BB].size() << "\n";
       }
       return true;
    }
@@ -390,15 +476,19 @@ namespace {
       if(NextI == nullptr){
 	 return;
       }
+      AllocaInst* AI = nullptr;
       IRBuilder<> Builder(NextI);
       StoreInst* Store0 =  nullptr;
       int ID = 0;
-      if(I.getOpcode() == 30){
-	 ID = I.getType()->getTypeID();
+      if(I.getOpcode() == 30 || I.getOpcode() == 32){
+	 AI = dyn_cast<AllocaInst>(I.getOperand(0));
+//	 ID = I.getType()->getTypeID();
       }
       else{
-	 ID = I.getOperand(0)->getType()->getTypeID();
+	 AI = dyn_cast<AllocaInst>(I.getOperand(1));
+//	 ID = I.getOperand(0)->getType()->getTypeID();
       }
+      ID = AI->getType()->getElementType()->getTypeID();
       switch (ID) {//each case allows to check the type and store 0 type get<Typename>Ty at @operand with volatile=true in order to survive other pass
 
 	 case Type::IntegerTyID:
@@ -447,8 +537,8 @@ namespace {
 	    }
 	    break;
 	 case Type::ArrayTyID:
-	    ArrayType* array = dyn_cast<ArrayType>(I.getType());
-	    Store0 = Builder.CreateStore(Constant::getNullValue(array), V, true);
+	    ArrayType* array = dyn_cast<ArrayType>(AI->getType()->getElementType());
+	    Store0 = Builder.CreateStore(Constant::getNullValue(array), AI, true);
 	    break;
       }
       if(Store0 == nullptr){
@@ -460,7 +550,6 @@ namespace {
 	    I.getDebugLoc().print(errs());
 	    errs() << "\n";
 	 }
-	 errs() << "new store 0\n";
       }
       numSTORE0ADDED++;
    }
