@@ -12,7 +12,7 @@ function binGenerator {
    if [[ "$3" == "D" ]]
    then
       opt -dse < $1.bc > temp.bc
-      opt -load ~/storm/llvm-joujou/test/storm_project/build/DeadVariableHandler/LLVMDeadVariableHandler.so -DVH < temp.bc > $2.bc
+      opt -load ~/storm/llvm-joujou/test/storm_project/build/PutAtZero/LLVMPutAtZero.so -PaZ < temp.bc > $2.bc
    fi
    llvm-dis -o $1.ll $2.bc
    llc $2.bc
