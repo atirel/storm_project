@@ -98,8 +98,8 @@ namespace {
 	       //	| x unused     |
 	       //	----------------
 	       //
-	       //If we consider the header block as a part of the dominators we use, it will be considerated as the last dominator using x, while the loop body might be executed after
-	       //Hence, we cannot add the headers to our vector which purpose is to find the first dominator after the last use of each variable
+	       // If we consider the header block as a part of the dominators we use, it will be considerated as the last dominator using x, while the loop body might be executed after
+	       // Hence, we cannot add the headers to our vector which purpose is to find the first dominator after the last use of each variable
    	       dominator_blocks.push_back(B_new);
 	    }
 	    BB = B_new;
@@ -129,9 +129,9 @@ namespace {
       }
 
       std::list<BasicBlock*> toTreat;
-      //we will have to visit all the blocks from the return one to the first one.
-      //We cannot iterate easily over them since some of them will be visited several times (each block with more than one successor is visited after each successor so at least twice)
-      //we use a FIFO construction to handle the blocks in the right order
+      // We will have to visit all the blocks from the return one to the first one.
+      // We cannot iterate easily over them since some of them will be visited several times (each block with more than one successor is visited after each successor so at least twice)
+      // We use a FIFO construction to handle the blocks in the right order
       toTreat.push_back(&F.back());
       
       if(loopData.isLoopHeader(&F.back())){
@@ -220,11 +220,11 @@ namespace {
     *
     **/
    BasicBlock* getFirstDom(std::vector<BasicBlock*> &dominators, BasicBlock* BB, DominatorTree& DT){
-      if(std::find(dominators.begin(), dominators.end(), BB) != dominators.end()){
+      if(std::find(dominators.begin(), dominators.end(), BB) != dominators.end()){//if BB is a dominator, then BB is the first dominator block "after" itself
  	 return BB;
       }
-      BasicBlock* retBlock = &BB->getParent()->back();
-      for(auto it = dominators.begin(), end = dominators.end(); it != end; ++it){
+      BasicBlock* retBlock = &BB->getParent()->back();//else we start from the last block which contains the return instruction and by definition is a dominator block
+      for(auto it = dominators.begin(), end = dominators.end(); it != end; ++it){//and we iterate over dominators to find the closest to BB
 	 if(DT.properlyDominates(BB, *it)){
 	    retBlock = *it;
 	 }
@@ -236,7 +236,7 @@ namespace {
 
    /**
     * @function array_handler:
-    * handle array which are some "weird variables" and put a 0 in all their cases after the last use
+    * handle array which are some "weird variables" and put a 0 in all their cases after the "last use" (last access to an array case)
     * @param F the current running function
     * @param dominator_blocks, the vector containing all the dominators
     * @param DT the dominator tree, for method calling purposes
@@ -244,13 +244,13 @@ namespace {
     *
     **/
    void array_handler(Function& F, std::vector<BasicBlock*> &dominator_blocks, DominatorTree& DT){
-      std::vector<AllocaInst*> atZeroArrays;
+      std::vector<AllocaInst*> atZeroArrays;//arrays already to 0
       BasicBlock* BB = &F.back();
       while(BB != nullptr){
 	 Instruction* I = BB->getTerminator();
-	 while(I != nullptr){
+	 while(I != nullptr){//we iterate over the instructions from the last one to the first one to find any array access (opcode 32)
 	    if(I->getOpcode() == 32){
-	       if(AllocaInst* AI = dyn_cast<AllocaInst>(I->getOperand(0))){
+	       if(AllocaInst* AI = dyn_cast<AllocaInst>(I->getOperand(0))){//we check that it access a 
 		  if(std::find(atZeroArrays.begin(), atZeroArrays.end(), AI) == atZeroArrays.end()){
    		     dead_array(I, dominator_blocks, DT);
    		     atZeroArrays.push_back(AI);
@@ -354,7 +354,15 @@ namespace {
    }
 
 
-   void partial_treat(BasicBlock* BB){//technically only for loop headers only puts at zero
+   /**
+    * @function partial_treat:
+    * manages the blocks which are in a loop but only to set them to 0 when necessary, not modifying their boolean status
+    * @param BB a basicblock which is to be treated
+    * @precond BB is part of a loop
+    * @returns nothing but BB is modified to set to 0 any variable locally dead
+    *
+    **/
+   void partial_treat(BasicBlock* BB){//technically only for loop blocks
       std::vector<std::pair<std::pair<AllocaInst*, int>, Instruction*>> varia_vect;
       Instruction* I = BB->getTerminator();
       while(I != nullptr){
@@ -403,6 +411,20 @@ namespace {
       }
    }
 
+   /**
+    *
+    * @function isToBePushed:
+    * uses the information in the toTreat list in order to know if a BasicBlock is to be pushed 
+    * or if it is already in the list and thus should be updated.
+    * updates the Block subsenquently.
+    * @param iList, the variables and their boolean status for each block which will be used to update if necessary
+    * @param toTreat, the list with all the untreated BasicBlocks
+    * @param futureBlock, the BasicBlock tested: is futureBlock supposed to be pushed in the toTreat list
+    * @returns true if the BasicBlock is not in the toTreat list and then should be added to be treated later
+    * false elsewhere.
+    * if false is returned, the futureBlock status in iList is updated to take into consideration the information of the current block
+    *
+    **/
    bool isToBePushed(InstructionList &iList, std::list<BasicBlock*> &toTreat, BasicBlock* futureBlock){
       if(toTreat.size() == 0){
 	 return true;
@@ -417,6 +439,17 @@ namespace {
       return true;
    }
 
+   /**
+    *
+    * @function andBetweenBlocks:
+    * updates the information in the iList (the boolean status of the variables modified) according to the fact that both current_block and an already treated block lead to futureBlock
+    * @param iList, the vector with the variables and their boolean status for each block
+    * @param current_block, the block we are currently treating
+    * @param futureBlock, the supposedly next block to treat
+    * @precond in our case, futureBlock must be a predecessor of current_block
+    * @returns nothing but updates the information for the futureBlock according to the fact that the current_block is one of its successors
+    *
+    **/
    void andBetweenBlocks(InstructionList &iList, BasicBlock *current_block, BasicBlock* futureBlock){
       for(int i = 0; i < iList[futureBlock].size(); ++i){
 	 for(int j = 0; j < iList[current_block].size(); ++j){
@@ -455,6 +488,39 @@ namespace {
 	 while(I != nullptr){
    	    bool found = false;
    	    if(I->getOpcode() == 30){
+	       if(AllocaInst* AI = dyn_cast<AllocaInst>(I->getOperand(0))){
+   		  for(int k = 0; k < iList[BB].size(); ++k){
+   		     if(iList[BB][k].first == AI){
+   			iList[BB][k].second = false;
+   			found = true;
+   		     }
+   		  }
+   		  if(!found){
+   		     IsDead varia;
+   		     varia.first = AI;
+   		     varia.second = false;
+   		     iList[BB].push_back(varia);
+	    	     addStore0(*I, I->getOperand(I->getNumOperands() - 1), &firstDominatorBlock->front());
+   		  }
+   	       }
+	    }
+	    if(I->getOpcode() == 31){
+	       if(AllocaInst *AI = dyn_cast<AllocaInst>(I->getOperand(1))){
+   		  for(int k = 0; k < iList[BB].size(); ++k){
+   		     if(iList[BB][k].first == AI){
+   			iList[BB][k].second = true;
+   			found = true;
+   		     }
+   		  }
+   		  if(!found){
+   		     IsDead varia;
+   		     varia.first = AI;
+  		     varia.second = true;
+   		     iList[BB].push_back(varia);
+	    	     addStore0(*I, I->getOperand(I->getNumOperands() - 1), &firstDominatorBlock->front());
+   		  }
+   	       }
+	    }
 	       if(AllocaInst* AI = dyn_cast<AllocaInst>(I->getOperand(0))){
    		  for(int k = 0; k < iList[BB].size(); ++k){
    		     if(iList[BB][k].first == AI){
@@ -568,39 +634,6 @@ namespace {
   	    }
   	 }
       }
-      return false;
-   }
-
-
-   /**@function addStore0
-    * adds a store 0 of the Value V, before the instruction Iplace.
-    * in debug mode, it tries to display where in the source code it decided to add this store 0 instruction.
-    * @param I, the instruction with all the data we need
-    * @param V, the Value containing the type of store 0 we want (default, the value accessed by I)
-    * @param Iplace, the instruction before which we want to add a store 0 instruction (default, before the instruction following I)
-    * @returns nothing but
-    * @postcond a Store 0 instruction was added before Iplace or right after I
-    **/
-   void addStore0(Instruction &I, Value* V = nullptr, Instruction *Iplace = nullptr){
-      Instruction *NextI = Iplace;
-      if(NextI == nullptr){
-	 NextI = I.getNextNode();
-      }
-      if(V == nullptr){
-   	 V = I.getOperand(I.getNumOperands() - 1);
-      }
-      if(NextI == nullptr){
-	 return;
-      }
-      AllocaInst* AI = nullptr;
-      IRBuilder<> Builder(NextI);
-      StoreInst* Store0 =  nullptr;
-      int ID = 0;
-      if(I.getOpcode() == 30 || I.getOpcode() == 32){
-	 AI = dyn_cast<AllocaInst>(I.getOperand(0));
-      }
-      else{
-	 if(AI = dyn_cast<AllocaInst>(&I)){
 	 }
 	 else{
 	 AI = dyn_cast<AllocaInst>(I.getOperand(1));
