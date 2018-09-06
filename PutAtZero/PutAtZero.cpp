@@ -474,7 +474,6 @@ namespace {
    bool isAtZeroAtTheEnd(BasicBlock* BB, Value* V){
       Instruction* I = BB->getTerminator();
       while(I != nullptr){
-	    errs() << "coucou\n";
 	 if(I->getOpcode() == 31 && I->getOperand(1) == V){
 	    if(Constant* C = dyn_cast<Constant>(I->getOperand(0))){
 	       if(C->isNullValue()){
