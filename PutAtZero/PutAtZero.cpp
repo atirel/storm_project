@@ -471,6 +471,24 @@ namespace {
       AU.addRequired<DominatorTreeWrapperPass>();
    }
 
+   bool isAtZeroAtTheEnd(BasicBlock* BB, Value* V){
+      Instruction* I = BB->getTerminator();
+      while(I != nullptr){
+	    errs() << "coucou\n";
+	 if(I->getOpcode() == 31 && I->getOperand(1) == V){
+	    if(Constant* C = dyn_cast<Constant>(I->getOperand(0))){
+	       if(C->isNullValue()){
+		  return true;
+	       }
+	    }
+	    return false;
+	 }
+	 if(I->getOpcode() == 30 && I->getOperand(0) == V){
+	    return false;
+	 }
+	 I = I->getPrevNode();
+      }
+   }
    /**
     * @function setD:
     * this function sets the boolean status of the variable (dead or alive)
@@ -500,7 +518,9 @@ namespace {
    		     varia.first = AI;
    		     varia.second = false;
    		     iList[BB].push_back(varia);
-	    	     addStore0(*I, I->getOperand(I->getNumOperands() - 1), &firstDominatorBlock->front());
+		     if(!isAtZeroAtTheEnd(firstDominatorBlock, AI)){
+			addStore0(*I, I->getOperand(I->getNumOperands() - 1), &firstDominatorBlock->front());
+		     }
    		  }
    	       }
 	    }
@@ -517,40 +537,9 @@ namespace {
    		     varia.first = AI;
   		     varia.second = true;
    		     iList[BB].push_back(varia);
-	    	     addStore0(*I, I->getOperand(I->getNumOperands() - 1), &firstDominatorBlock->front());
-   		  }
-   	       }
-	    }
-	       if(AllocaInst* AI = dyn_cast<AllocaInst>(I->getOperand(0))){
-   		  for(int k = 0; k < iList[BB].size(); ++k){
-   		     if(iList[BB][k].first == AI){
-   			iList[BB][k].second = false;
-   			found = true;
-   		     }
-   		  }
-   		  if(!found){
-   		     IsDead varia;
-   		     varia.first = AI;
-   		     varia.second = false;
-   		     iList[BB].push_back(varia);
-	    	     addStore0(*I, I->getOperand(I->getNumOperands() - 1), &firstDominatorBlock->front());
-   		  }
-   	       }
-	    }
-	    if(I->getOpcode() == 31){
-	       if(AllocaInst *AI = dyn_cast<AllocaInst>(I->getOperand(1))){
-   		  for(int k = 0; k < iList[BB].size(); ++k){
-   		     if(iList[BB][k].first == AI){
-   			iList[BB][k].second = true;
-   			found = true;
-   		     }
-   		  }
-   		  if(!found){
-   		     IsDead varia;
-   		     varia.first = AI;
-  		     varia.second = true;
-   		     iList[BB].push_back(varia);
-	    	     addStore0(*I, I->getOperand(I->getNumOperands() - 1), &firstDominatorBlock->front());
+		     if(!isAtZeroAtTheEnd(firstDominatorBlock, AI)){
+   			addStore0(*I, I->getOperand(I->getNumOperands() - 1), &firstDominatorBlock->front());
+		     }
    		  }
    	       }
 	    }
@@ -614,7 +603,7 @@ namespace {
 	 varia.second = true;
 	 iList[BB].push_back(varia);
       }
-      if(BB != firstDominatorBlock){
+      if(BB != firstDominatorBlock && !isAtZeroAtTheEnd(firstDominatorBlock, I->getOperand(I->getNumOperands() - 1))){
 	 addStore0(*I, I->getOperand(I->getNumOperands() - 1), &firstDominatorBlock->front());
       }
       return true;
@@ -634,9 +623,47 @@ namespace {
   	    }
   	 }
       }
+      return false;
+   }
+
+
+
+   /**
+    * @function addStore0
+    * adds a store 0 of the Value V, before the instruction Iplace.
+    * in debug mode, it tries to display where in the source code it decided to add this store 0 instruction.
+    * @param I, the instruction with all the data we need
+    * @param V, the Value containing the type of store 0 we want (default, the value accessed by I)
+    * @param Iplace, the instruction before which we want to add a store 0 instruction (default, before the instruction following I)
+    * @returns nothing but
+    * @postcond a Store 0 instruction was added before Iplace or right after I
+    *
+    **/
+
+   void addStore0(Instruction &I, Value* V = nullptr, Instruction *Iplace = nullptr){
+      Instruction *NextI = Iplace;
+      if(NextI == nullptr){
+	 NextI = I.getNextNode();
+      }
+      if(V == nullptr){
+	 V = I.getOperand(I.getNumOperands() - 1);
+      }
+      if(NextI == nullptr){
+	 return;
+      }
+      AllocaInst* AI = nullptr;
+      IRBuilder<> Builder(NextI);
+      StoreInst* Store0 =  nullptr;
+      int ID = 0;
+
+      if(I.getOpcode() == 30 || I.getOpcode() == 32){
+	 AI = dyn_cast<AllocaInst>(I.getOperand(0));
+      }
+      else{
+	 if(AI = dyn_cast<AllocaInst>(&I)){
 	 }
 	 else{
-	 AI = dyn_cast<AllocaInst>(I.getOperand(1));
+   	    AI = dyn_cast<AllocaInst>(I.getOperand(1));
 	 }
       }
       ID = AI->getType()->getElementType()->getTypeID();
