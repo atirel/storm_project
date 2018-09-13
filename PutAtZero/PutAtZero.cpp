@@ -55,6 +55,9 @@ namespace {
     *
     **/
    bool runOnFunction(Function &F) override {
+
+      initialize(F);
+
       LoopInfo& loopData = getAnalysis<LoopInfoWrapperPass>().getLoopInfo();
       DominatorTree& DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
 
@@ -301,6 +304,15 @@ namespace {
       }
    }
 
+   void initialize(Function& F){
+      BasicBlock* firstBlock = &F.front();
+      for(Instruction& I : *firstBlock){
+	 if(AllocaInst* AI = dyn_cast<AllocaInst>(&I)){
+	    addStore0(I, AI);
+	 }
+      }
+   }
+
    /**
     * @function loop_handler:
     * handles the loops variables manipulations
@@ -451,11 +463,16 @@ namespace {
     *
     **/
    void andBetweenBlocks(InstructionList &iList, BasicBlock *current_block, BasicBlock* futureBlock){
-      for(int i = 0; i < iList[futureBlock].size(); ++i){
-	 for(int j = 0; j < iList[current_block].size(); ++j){
+      for(int j = 0; j < iList[current_block].size(); ++j){
+	 bool found = false;
+     	 for(int i = 0; i < iList[futureBlock].size(); ++i){
 	    if(iList[futureBlock][i].first == iList[current_block][j].first){
 	       iList[futureBlock][i].second = iList[futureBlock][i].second && iList[current_block][j].second;
+	       found = true;
 	    }
+	 }
+	 if(!found){
+	    iList[futureBlock].push_back(iList[current_block][j]);
 	 }
       }
    }
@@ -471,6 +488,13 @@ namespace {
       AU.addRequired<DominatorTreeWrapperPass>();
    }
 
+   /**
+    * @function isAtZeroAtTheEnd:
+    * Checks if the given value (which matches a variable) is set to 0 at the end of a given basicBlock
+    * @param BB the basicBlock we want to test
+    * @param V the variable casted as a value for simpler manipulations
+    * @returns true if the 
+    **/
    bool isAtZeroAtTheEnd(BasicBlock* BB, Value* V){
       Instruction* I = BB->getTerminator();
       while(I != nullptr){
@@ -488,6 +512,7 @@ namespace {
 	 I = I->getPrevNode();
       }
    }
+
    /**
     * @function setD:
     * this function sets the boolean status of the variable (dead or alive)
@@ -669,12 +694,7 @@ namespace {
       switch (ID) {//each case allows to check the type and store 0 type get<Typename>Ty at @operand with volatile=true in order to survive other pass
 
 	 case Type::IntegerTyID:
-	    if(I.getOpcode() == 30){
-   	       Store0 = Builder.CreateStore(ConstantInt::get(Builder.getIntNTy(cast<IntegerType>(I.getType())->getBitWidth()), 0), V, true);
-	    }
-	    else{
-	       Store0 = Builder.CreateStore(ConstantInt::get(Builder.getIntNTy(cast<IntegerType>(I.getOperand(0)->getType())->getBitWidth()), 0), V, true);
-	    }
+	    Store0 = Builder.CreateStore(ConstantInt::get(Builder.getIntNTy(cast<IntegerType>(AI->getType()->getElementType())->getBitWidth()), 0), AI, true);
 	    break;
 		 
 	 case Type::FloatTyID:
