@@ -7,8 +7,11 @@ target triple = "x86_64-unknown-linux-gnu"
 ; Function Attrs: nounwind uwtable
 define void @displayer(i32, i32, i32) #0 {
   %4 = alloca i32, align 4
+  store volatile i32 0, i32* %4
   %5 = alloca i32, align 4
+  store volatile i32 0, i32* %5
   %6 = alloca i32, align 4
+  store volatile i32 0, i32* %6
   store i32 %0, i32* %4, align 4
   store i32 %1, i32* %5, align 4
   store i32 %2, i32* %6, align 4
@@ -27,9 +30,13 @@ declare i32 @printf(i8*, ...) #1
 ; Function Attrs: nounwind uwtable
 define i32 @main() #0 {
   %1 = alloca i32, align 4
+  store volatile i32 0, i32* %1
   %2 = alloca i32, align 4
+  store volatile i32 0, i32* %2
   %3 = alloca i32, align 4
+  store volatile i32 0, i32* %3
   %4 = alloca i32, align 4
+  store volatile i32 0, i32* %4
   store i32 0, i32* %1, align 4
   %5 = call i64 @time(i64* null) #3
   %6 = trunc i64 %5 to i32
@@ -142,10 +149,9 @@ define i32 @main() #0 {
   br label %57
 
 ; <label>:57:                                     ; preds = %56, %34
-  store volatile i32 0, i32* %2
   store volatile i32 0, i32* %4
   store volatile i32 0, i32* %3
-  store volatile i32 0, i32* %1
+  store volatile i32 0, i32* %2
   ret i32 0
 }
 

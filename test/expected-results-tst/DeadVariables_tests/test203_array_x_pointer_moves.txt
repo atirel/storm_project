@@ -1,0 +1,119 @@
+source_filename = "test203_array_x_pointer_moves.c"
+target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
+target triple = "x86_64-unknown-linux-gnu"
+
+@.str = private unnamed_addr constant [7 x i8] c"j == 0\00", align 1
+@.str.1 = private unnamed_addr constant [32 x i8] c"test203_array_x_pointer_moves.c\00", align 1
+@__PRETTY_FUNCTION__.manager = private unnamed_addr constant [20 x i8] c"void manager(int *)\00", align 1
+@.str.2 = private unnamed_addr constant [4 x i8] c"%d \00", align 1
+
+; Function Attrs: nounwind uwtable
+define void @manager(i32*) #0 {
+  %2 = alloca i32*, align 8
+  store volatile i32* null, i32** %2
+  %3 = alloca i32, align 4
+  store volatile i32 0, i32* %3
+  %4 = alloca i32, align 4
+  store volatile i32 0, i32* %4
+  %5 = alloca i32, align 4
+  store volatile i32 0, i32* %5
+  store i32* %0, i32** %2, align 8
+  store i32 1, i32* %3, align 4
+  store i32 2, i32* %4, align 4
+  store volatile i32 0, i32* %4
+  %6 = call i64 @time(i64* null) #4
+  %7 = trunc i64 %6 to i32
+  call void @srand(i32 %7) #4
+  %8 = call i32 @rand() #4
+  store i32 %8, i32* %5, align 4
+  br label %9
+
+; <label>:9:                                      ; preds = %24, %1
+  %10 = load i32, i32* %3, align 4
+  %11 = load i32, i32* %5, align 4
+  %12 = icmp ult i32 %10, %11
+  br i1 %12, label %13, label %36
+
+; <label>:13:                                     ; preds = %9
+  %14 = load i32, i32* %3, align 4
+  %15 = zext i32 %14 to i64
+  %16 = load i32*, i32** %2, align 8
+  %17 = getelementptr inbounds i32, i32* %16, i64 %15
+  %18 = load i32, i32* %17, align 4
+  store i32 %18, i32* %4, align 4
+  %19 = load i32, i32* %4, align 4
+  %20 = icmp eq i32 %19, 0
+  br i1 %20, label %21, label %22
+
+; <label>:21:                                     ; preds = %13
+  br label %24
+
+; <label>:22:                                     ; preds = %13
+  store volatile i32 0, i32* %5
+  store volatile i32 0, i32* %4
+  store volatile i32 0, i32* %3
+  store volatile i32* null, i32** %2
+  call void @__assert_fail(i8* getelementptr inbounds ([7 x i8], [7 x i8]* @.str, i32 0, i32 0), i8* getelementptr inbounds ([32 x i8], [32 x i8]* @.str.1, i32 0, i32 0), i32 13, i8* getelementptr inbounds ([20 x i8], [20 x i8]* @__PRETTY_FUNCTION__.manager, i32 0, i32 0)) #5
+  unreachable
+                                                  ; No predecessors!
+  br label %24
+
+; <label>:24:                                     ; preds = %23, %21
+  %25 = load i32, i32* %5, align 4
+  %26 = load i32, i32* %3, align 4
+  %27 = udiv i32 %25, %26
+  %28 = load i32, i32* %3, align 4
+  %29 = zext i32 %28 to i64
+  %30 = load i32*, i32** %2, align 8
+  %31 = getelementptr inbounds i32, i32* %30, i64 %29
+  store i32 %27, i32* %31, align 4
+  %32 = load i32, i32* %3, align 4
+  %33 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @.str.2, i32 0, i32 0), i32 %32)
+  %34 = load i32, i32* %3, align 4
+  store volatile i32 0, i32* %3
+  %35 = add i32 %34, 1
+  store i32 %35, i32* %3, align 4
+  br label %9
+
+; <label>:36:                                     ; preds = %9
+  store volatile i32 0, i32* %4
+  store volatile i32* null, i32** %2
+  store volatile i32 0, i32* %3
+  store volatile i32 0, i32* %5
+  ret void
+}
+
+; Function Attrs: nounwind
+declare void @srand(i32) #1
+
+; Function Attrs: nounwind
+declare i64 @time(i64*) #1
+
+; Function Attrs: nounwind
+declare i32 @rand() #1
+
+; Function Attrs: noreturn nounwind
+declare void @__assert_fail(i8*, i8*, i32, i8*) #2
+
+declare i32 @printf(i8*, ...) #3
+
+; Function Attrs: nounwind uwtable
+define i32 @main() #0 {
+  %1 = alloca [4 x i32], align 16
+  store volatile [4 x i32] zeroinitializer, [4 x i32]* %1
+  %2 = getelementptr inbounds [4 x i32], [4 x i32]* %1, i32 0, i32 0
+  store volatile [4 x i32] zeroinitializer, [4 x i32]* %1
+  call void @manager(i32* %2)
+  ret i32 0
+}
+
+attributes #0 = { nounwind uwtable "disable-tail-calls"="false" "less-precise-fpmad"="false" "no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "no-infs-fp-math"="false" "no-jump-tables"="false" "no-nans-fp-math"="false" "no-signed-zeros-fp-math"="false" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+fxsr,+mmx,+sse,+sse2,+x87" "unsafe-fp-math"="false" "use-soft-float"="false" }
+attributes #1 = { nounwind "disable-tail-calls"="false" "less-precise-fpmad"="false" "no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "no-infs-fp-math"="false" "no-nans-fp-math"="false" "no-signed-zeros-fp-math"="false" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+fxsr,+mmx,+sse,+sse2,+x87" "unsafe-fp-math"="false" "use-soft-float"="false" }
+attributes #2 = { noreturn nounwind "disable-tail-calls"="false" "less-precise-fpmad"="false" "no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "no-infs-fp-math"="false" "no-nans-fp-math"="false" "no-signed-zeros-fp-math"="false" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+fxsr,+mmx,+sse,+sse2,+x87" "unsafe-fp-math"="false" "use-soft-float"="false" }
+attributes #3 = { "disable-tail-calls"="false" "less-precise-fpmad"="false" "no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "no-infs-fp-math"="false" "no-nans-fp-math"="false" "no-signed-zeros-fp-math"="false" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+fxsr,+mmx,+sse,+sse2,+x87" "unsafe-fp-math"="false" "use-soft-float"="false" }
+attributes #4 = { nounwind }
+attributes #5 = { noreturn nounwind }
+
+!llvm.ident = !{!0}
+
+!0 = !{!"clang version 3.9.1 (tags/RELEASE_391/final 334690)"}

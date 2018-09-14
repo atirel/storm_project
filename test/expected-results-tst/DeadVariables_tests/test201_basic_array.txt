@@ -12,10 +12,15 @@ target triple = "x86_64-unknown-linux-gnu"
 ; Function Attrs: nounwind uwtable
 define i32 @main() #0 {
   %1 = alloca i32, align 4
+  store volatile i32 0, i32* %1
   %2 = alloca [3 x i32], align 4
+  store volatile [3 x i32] zeroinitializer, [3 x i32]* %2
   %3 = alloca i32, align 4
+  store volatile i32 0, i32* %3
   %4 = alloca i32, align 4
+  store volatile i32 0, i32* %4
   %5 = alloca i32, align 4
+  store volatile i32 0, i32* %5
   store i32 0, i32* %1, align 4
   %6 = bitcast [3 x i32]* %2 to i8*
   call void @llvm.memcpy.p0i8.p0i8.i64(i8* %6, i8* bitcast ([3 x i32]* @main.array to i8*), i64 12, i32 4, i1 false)
@@ -26,6 +31,7 @@ define i32 @main() #0 {
   %10 = load i32, i32* %9, align 4
   store i32 %10, i32* %4, align 4
   %11 = getelementptr inbounds [3 x i32], [3 x i32]* %2, i64 0, i64 2
+  store volatile [3 x i32] zeroinitializer, [3 x i32]* %2
   %12 = load i32, i32* %11, align 4
   store i32 %12, i32* %5, align 4
   %13 = load i32, i32* %3, align 4
@@ -37,6 +43,11 @@ define i32 @main() #0 {
   br label %18
 
 ; <label>:16:                                     ; preds = %0
+  store volatile i32 0, i32* %5
+  store volatile i32 0, i32* %4
+  store volatile i32 0, i32* %3
+  store volatile [3 x i32] zeroinitializer, [3 x i32]* %2
+  store volatile i32 0, i32* %1
   call void @__assert_fail(i8* getelementptr inbounds ([7 x i8], [7 x i8]* @.str, i32 0, i32 0), i8* getelementptr inbounds ([22 x i8], [22 x i8]* @.str.1, i32 0, i32 0), i32 8, i8* getelementptr inbounds ([11 x i8], [11 x i8]* @__PRETTY_FUNCTION__.main, i32 0, i32 0)) #3
   unreachable
                                                   ; No predecessors!
@@ -52,6 +63,11 @@ define i32 @main() #0 {
   br label %24
 
 ; <label>:22:                                     ; preds = %18
+  store volatile i32 0, i32* %5
+  store volatile i32 0, i32* %4
+  store volatile i32 0, i32* %3
+  store volatile [3 x i32] zeroinitializer, [3 x i32]* %2
+  store volatile i32 0, i32* %1
   call void @__assert_fail(i8* getelementptr inbounds ([7 x i8], [7 x i8]* @.str.2, i32 0, i32 0), i8* getelementptr inbounds ([22 x i8], [22 x i8]* @.str.1, i32 0, i32 0), i32 9, i8* getelementptr inbounds ([11 x i8], [11 x i8]* @__PRETTY_FUNCTION__.main, i32 0, i32 0)) #3
   unreachable
                                                   ; No predecessors!
@@ -67,16 +83,17 @@ define i32 @main() #0 {
   br label %30
 
 ; <label>:28:                                     ; preds = %24
+  store volatile i32 0, i32* %5
+  store volatile i32 0, i32* %4
+  store volatile i32 0, i32* %3
+  store volatile [3 x i32] zeroinitializer, [3 x i32]* %2
+  store volatile i32 0, i32* %1
   call void @__assert_fail(i8* getelementptr inbounds ([7 x i8], [7 x i8]* @.str.3, i32 0, i32 0), i8* getelementptr inbounds ([22 x i8], [22 x i8]* @.str.1, i32 0, i32 0), i32 10, i8* getelementptr inbounds ([11 x i8], [11 x i8]* @__PRETTY_FUNCTION__.main, i32 0, i32 0)) #3
   unreachable
                                                   ; No predecessors!
   br label %30
 
 ; <label>:30:                                     ; preds = %29, %27
-  store volatile i32 0, i32* %5
-  store volatile i32 0, i32* %4
-  store volatile i32 0, i32* %3
-  store volatile i32 0, i32* %1
   ret i32 0
 }
 

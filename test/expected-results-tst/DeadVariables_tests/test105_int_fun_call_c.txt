@@ -5,6 +5,7 @@ target triple = "x86_64-unknown-linux-gnu"
 ; Function Attrs: nounwind uwtable
 define i32 @function() #0 {
   %1 = alloca i32, align 4
+  store volatile i32 0, i32* %1
   store i32 12, i32* %1, align 4
   %2 = load i32, i32* %1, align 4
   store volatile i32 0, i32* %1

@@ -5,6 +5,7 @@ target triple = "x86_64-unknown-linux-gnu"
 ; Function Attrs: nounwind uwtable
 define i64 @f1() #0 {
   %1 = alloca i64, align 8
+  store volatile i64 0, i64* %1
   store i64 10000000, i64* %1, align 8
   %2 = load i64, i64* %1, align 8
   store volatile i64 0, i64* %1
@@ -14,6 +15,7 @@ define i64 @f1() #0 {
 ; Function Attrs: nounwind uwtable
 define i64 @f2(i32) #0 {
   %2 = alloca i32, align 4
+  store volatile i32 0, i32* %2
   store i32 %0, i32* %2, align 4
   %3 = load i32, i32* %2, align 4
   store volatile i32 0, i32* %2
@@ -24,6 +26,7 @@ define i64 @f2(i32) #0 {
 ; Function Attrs: nounwind uwtable
 define i32 @main() #0 {
   %1 = alloca i32, align 4
+  store volatile i32 0, i32* %1
   %2 = call i64 @f1()
   store i32 1, i32* %1, align 4
   %3 = load i32, i32* %1, align 4

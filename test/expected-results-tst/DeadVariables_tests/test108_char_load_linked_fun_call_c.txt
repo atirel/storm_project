@@ -10,7 +10,9 @@ define signext i8 @f1() #0 {
 ; Function Attrs: nounwind uwtable
 define signext i8 @f2(i8 signext) #0 {
   %2 = alloca i8, align 1
+  store volatile i8 0, i8* %2
   %3 = alloca i8, align 1
+  store volatile i8 0, i8* %3
   store i8 %0, i8* %2, align 1
   %4 = call signext i8 @f1()
   %5 = load i8, i8* %2, align 1
@@ -24,6 +26,7 @@ define signext i8 @f2(i8 signext) #0 {
 ; Function Attrs: nounwind uwtable
 define i32 @main() #0 {
   %1 = alloca i8, align 1
+  store volatile i8 0, i8* %1
   store i8 115, i8* %1, align 1
   %2 = load i8, i8* %1, align 1
   store volatile i8 0, i8* %1

@@ -1,4 +1,4 @@
-source_filename = "test302_if_else.c"
+source_filename = "test308_do_while_loop.c"
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
 
@@ -8,24 +8,29 @@ define i32 @main() #0 {
   store volatile i32 0, i32* %1
   %2 = alloca i32, align 4
   store volatile i32 0, i32* %2
+  %3 = alloca i32, align 4
+  store volatile i32 0, i32* %3
   store i32 0, i32* %1, align 4
-  store i32 97, i32* %2, align 4
-  %3 = load i32, i32* %2, align 4
-  store volatile i32 0, i32* %2
-  %4 = icmp slt i32 %3, 70
-  br i1 %4, label %5, label %6
+  store i32 1000, i32* %2, align 4
+  br label %4
 
-; <label>:5:                                      ; preds = %0
-  store i32 97, i32* %2, align 4
+; <label>:4:                                      ; preds = %9, %0
+  %5 = load i32, i32* %2, align 4
+  %6 = add nsw i32 %5, 1
+  store i32 %6, i32* %3, align 4
+  %7 = load i32, i32* %2, align 4
   store volatile i32 0, i32* %2
-  br label %7
+  %8 = add nsw i32 %7, -1
+  store i32 %8, i32* %2, align 4
+  br label %9
 
-; <label>:6:                                      ; preds = %0
-  store i32 70, i32* %2, align 4
-  store volatile i32 0, i32* %2
-  br label %7
+; <label>:9:                                      ; preds = %4
+  %10 = load i32, i32* %2, align 4
+  %11 = icmp ne i32 %10, 0
+  br i1 %11, label %4, label %12
 
-; <label>:7:                                      ; preds = %6, %5
+; <label>:12:                                     ; preds = %9
+  store volatile i32 0, i32* %3
   store volatile i32 0, i32* %2
   ret i32 0
 }
