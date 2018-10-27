@@ -4,7 +4,7 @@ This LLVM Pass was written during an internship at Inria Bordeaux sud ouest (Tal
 As far as my knowledge goes for copyrights, it is available for everyone and can be seen by anyone.
 
 Version française : ligne 12
-English version: line 55
+English version: line 35
 Versión Española: linea 
 
 
@@ -24,33 +24,13 @@ Les Passes DoubleStoreElimination et DeadVariableHandler sont d'anciennes approc
 Notes :
 
 *La version de LLVM minimale requise est la version 3.9
+
 *Les détails de la compilation de LLVM et de la réalisation d'une passe sont disponibles sur le site de LLVM (version française en cours de rédaction de mon côté)
-=+=+=+=+~~~~+=+==+===+=+=+=+=+~~~~+=+==+===+=+=+=+=+~~~~+=+==+===+=+=+=+=+~~~~+=+==+===+=+=+=+=+~~~~+=+==+===+=+=+=+=+~~~~+=+==+===+
 
-   |:~8a.`~888a:::::::::::::::88......88:::::::::::::::;a8~".a888~|     |* * * * * * * * * * OOOOOOOOOOOOOOOOOOOOOOOOO|
-   |::::~8a.`~888a::::::::::::88......88::::::::::::;a8~".a888~:::|     | * * * * * * * * *  OOOOOOOOOOOOOOOOOOOOOOOOO|
-   |:::::::~8a.`~888a:::::::::88......88:::::::::;a8~".a888~::::::|     |* * * * * * * * * * OOOOOOOOOOOOOOOOOOOOOOOOO|
-   |::::::::::~8a.`~888a::::::88......88::::::;a8~".a888~:::::::::|     | * * * * * * * * *  OOOOOOOOOOOOOOOOOOOOOOOOO|
-   |:::::::::::::~8a.`~888a:::88......88:::;a8~".a888~::::::::::::|     |* * * * * * * * * * OOOOOOOOOOOOOOOOOOOOOOOOO|
-   |::::::::::::::::~8a.`~888a88......88;a8~".a888~:::::::::::::::|     |* * * * * * * * * * OOOOOOOOOOOOOOOOOOOOOOOOO|
-   |:::::::::::::::::::~8a.`~888......88~".a888~::::::::::::::::::|     | * * * * * * * * *  OOOOOOOOOOOOOOOOOOOOOOOOO|
-   |8888888888888888888888888888......8888888888888888888888888888|     |* * * * * * * * * * OOOOOOOOOOOOOOOOOOOOOOOOO|
-   |..............................................................|     |OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO|
-   |..............................................................|     |OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO|
-   |8888888888888888888888888888......8888888888888888888888888888|     |OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO|
-   |::::::::::::::::::a888~".a88......888a."~8;:::::::::::::::::::|     |OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO|
-   |:::::::::::::::a888~".a8~:88......88~888a."~8;::::::::::::::::|     |OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO|
-   |::::::::::::a888~".a8~::::88......88:::~888a."~8;:::::::::::::|     |OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO|
-   |:::::::::a888~".a8~:::::::88......88::::::~888a."~8;::::::::::| 
-   |::::::a888~".a8~::::::::::88......88:::::::::~888a."~8;:::::::|
-   |:::a888~".a8~:::::::::::::88......88::::::::::::~888a."~8;::::|
-   |a888~".a8~::::::::::::::::88......88:::::::::::::::~888a."~8;:|
-                                    
-=+=+=+=+~~~~+=+==+===+=+=+=+=+~~~~+=+==+===+=+=+=+=+~~~~+=+==+===+=+=+=+=+~~~~+=+==+===+=+=+=+=+~~~~+=+==+===+=+=+=+=+~~~~+=+==+===+
-Flag credits:
--Wayne Jones, Coventry UK- (UK Flag)
 
-=+=+=+=+~~~~+=+==+===+=+=+=+=+~~~~+=+==+===+=+=+=+=+~~~~+=+==+===+=+=+=+=+~~~~+=+==+===+=+=+=+=+~~~~+=+==+===+=+=+=+=+~~~~+=+==+===+
+
+
+
 
 English version:
 
